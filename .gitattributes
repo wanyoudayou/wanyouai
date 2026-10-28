@@ -1,0 +1,2 @@
+# Machine-specific Agent tooling is not part of downloadable source archives.
+.agents export-ignore

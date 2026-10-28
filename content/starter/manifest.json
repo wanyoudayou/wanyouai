@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "id": "getting-started-v1",
+  "pricing": "content/starter/pricing.html",
+  "articles": [
+    {
+      "slug": "getting-started-overview",
+      "title": "功能与使用方式",
+      "source": "content/starter/overview.md"
+    },
+    {
+      "slug": "getting-started-preparation",
+      "title": "部署准备",
+      "source": "docs/deployment/guide.md",
+      "sections": ["0. 部署准备", "1. 获取源码与安装工具"]
+    },
+    {
+      "slug": "getting-started-supabase",
+      "title": "Supabase 初始化",
+      "source": "docs/deployment/guide.md",
+      "sections": ["2. Supabase 项目创建与初始化"]
+    },
+    {
+      "slug": "getting-started-vercel",
+      "title": "网站部署与邮箱登录",
+      "source": "docs/deployment/guide.md",
+      "sections": ["3. Vercel 部署", "4. 配置自有域名（推荐）", "5. 邮箱登录与 Auth 回调"]
+    },
+    {
+      "slug": "getting-started-publishing",
+      "title": "首次设置与内容发布",
+      "source": "content/starter/publishing.md"
+    },
+    {
+      "slug": "getting-started-navigation",
+      "title": "名片、导航与收费方案",
+      "source": "content/starter/navigation.md"
+    },
+    {
+      "slug": "getting-started-optional",
+      "title": "可选功能与部署检查",
+      "source": "docs/deployment/guide.md",
+      "sections": ["6.1 事务邮件：权益通知等（可选）", "6.2 在线支付（可选）", "6.3 自动任务：邮件发送、查单与到期提醒", "6.4 AI 设置与站主分身（可选）", "6.5 匿名提问的人机验证（可选）", "6.6 知识库构建、启用与日常更新", "6.7 人工确认：如何完成实际部署验收"]
+    },
+    {
+      "slug": "getting-started-maintenance",
+      "title": "升级与日常维护",
+      "source": "docs/deployment/guide.md",
+      "sections": ["7. 更新与日常维护"]
+    }
+  ]
+}

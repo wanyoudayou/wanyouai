@@ -1,0 +1,214 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "../styles/vendor/shadcn-tailwind.css";
+@import "../styles/tokens.css";
+@import "../styles/cards.css";
+@import "../styles/hero.css";
+@import "../styles/custom-pages.css";
+
+@source "../components";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: var(--opc-font-body);
+  --font-mono: var(--opc-font-mono);
+  --font-display: var(--opc-heading-font);
+  --color-success: var(--success);
+  --color-info: var(--info);
+  --color-warning: var(--warning);
+
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+
+  --radius-sm: var(--opc-radius-sm);
+  --radius-md: var(--opc-radius-md);
+  --radius-lg: var(--opc-radius-card);
+  --radius-xl: var(--opc-radius-xl);
+  --radius-2xl: 24px;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    @apply font-sans;
+  }
+
+  body {
+    @apply min-h-screen bg-background text-foreground antialiased;
+  }
+}
+
+/* 正文 / 预览共用阅读令牌。 */
+.reading-prose {
+  font-size: 1rem;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.reading-prose > * + * {
+  margin-top: 1.25rem;
+}
+.reading-prose h1,
+.reading-prose h2,
+.reading-prose h3,
+.reading-prose h4 {
+  font-weight: 500;
+  line-height: 1.4;
+  scroll-margin-top: 6rem;
+  margin-top: 2rem;
+}
+.reading-prose h1 {
+  font-size: 1.75rem;
+}
+.reading-prose h2 {
+  font-size: 1.5rem;
+}
+.reading-prose h3 {
+  font-size: 1.25rem;
+}
+.reading-prose a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.reading-prose ul {
+  list-style: disc;
+  padding-left: 1.5rem;
+}
+.reading-prose ol {
+  list-style: decimal;
+  padding-left: 1.5rem;
+}
+.reading-prose li + li {
+  margin-top: 0.4rem;
+}
+.reading-prose blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 1rem;
+  color: var(--muted-foreground);
+}
+.reading-prose pre {
+  overflow-x: auto;
+  background: var(--muted);
+  border-radius: var(--radius);
+  padding: 1rem;
+  font-size: 0.875rem;
+}
+.reading-prose :not(pre) > code {
+  background: var(--muted);
+  border-radius: 0.25rem;
+  padding: 0.15rem 0.3rem;
+  font-size: 0.875em;
+}
+.reading-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.reading-prose td,
+.reading-prose th {
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+.reading-prose th {
+  background: var(--muted);
+}
+.mermaid-diagram {
+  --_text: var(--foreground);
+  --_text-sec: var(--muted-foreground);
+  --_text-muted: var(--muted-foreground);
+  --_text-faint: var(--muted-foreground);
+  --_line: var(--muted-foreground);
+  --_arrow: var(--primary);
+  --_node-fill: var(--muted);
+  --_node-stroke: var(--border);
+  --_group-fill: var(--background);
+  --_group-hdr: var(--muted);
+  --_inner-stroke: var(--border);
+  --_key-badge: var(--muted);
+}
+.mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+.mermaid-diagram text {
+  font-family: var(--font-sans);
+}
+
+/* 分身气泡 Markdown：字号对齐面板头部标注（text-xs），标题仅略大 */
+.chat-prose-sm {
+  font-size: 0.75rem;
+  line-height: 1.7;
+}
+.chat-prose-sm :is(h1, h2, h3, h4, h5, h6) {
+  font-size: 0.875rem;
+}
+
+/* Shared surfaces use a solid fallback; blur is progressive enhancement. */
+.opc-glass {
+  background: var(--opc-glass-fallback);
+}
+@supports (backdrop-filter: blur(1px)) {
+  .opc-glass {
+    background: var(--opc-panel);
+    backdrop-filter: blur(var(--opc-glass-blur));
+  }
+}
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--opc-heading-font);
+}
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+:where(input, textarea, select) {
+  border-color: var(--input);
+}
+.reading-prose {
+  color: var(--foreground);
+}
+.reading-prose pre {
+  border: 1px solid var(--border);
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

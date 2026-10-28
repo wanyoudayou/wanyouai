@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>登录验证码</title>
+  </head>
+  <body style="margin: 0; padding: 24px 16px; background-color: #f5f5f7; color: #202124; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif; line-height: 1.7;">
+    <table role="presentation" style="width: 100%; max-width: 520px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff;">
+      <tr>
+        <td style="padding: 28px 24px;">
+          <h1 style="margin: 0 0 16px; font-size: 24px; line-height: 1.4;">登录验证码</h1>
+          <p style="margin: 0 0 16px; overflow-wrap: anywhere; word-break: break-word;">您正在登录 {{ .SiteURL }}。</p>
+          <p style="margin: 0 0 12px;">请回到发起登录的页面，输入以下验证码：</p>
+          <p style="margin: 0 0 20px; padding: 16px 12px; background-color: #f3f0ff; color: #312661; border-radius: 8px; font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace; font-size: 28px; font-weight: 700; letter-spacing: 2px; text-align: center;">{{ .Token }}</p>
+          <p style="margin: 0 0 12px;">也可在发起登录的同一浏览器打开：<a href="{{ .ConfirmationURL }}" style="color: #5845b5; text-decoration: underline;">登录本站</a>。</p>
+          <p style="margin: 0 0 16px;">验证码与链接仅需使用一种，成功登录后即不可重复使用。请勿向他人提供验证码或转发本邮件。</p>
+          <p style="margin: 0; color: #5f6368; font-size: 14px;">如果您没有发起登录，请忽略本邮件。</p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

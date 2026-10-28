@@ -1,0 +1,108 @@
+{
+  "legacy_upgrade": {
+    "file": "upgrades/complete-v1-to-release-baseline.sql",
+    "sha256": "c06ee9548f260588ddd7d287632f810bda8b550e3e75010ad3cede5718f137bf"
+  },
+  "payment_upgrade": {
+    "file": "upgrades/20261010053221-to-payment-reference.sql",
+    "sha256": "5ccc995d636e6aaab327ebc800b805a3b13a0af76ae156698745d32d001b43d8"
+  },
+  "format": "wanyou.database/1",
+  "schema_version": "20261026184628",
+  "migrations": [
+    {
+      "file": "20260928124423_release_baseline.sql",
+      "sha256": "09bc276c5e6428dc334a3f9013f724b85cd8f964e9bb0647f06c369c3c94ba89"
+    },
+    {
+      "file": "20260928155549_security_review_payment_and_visibility.sql",
+      "sha256": "dd0de14feda2e7e6bf88d82102522b5c0462407c9905be259f47653e9342877e"
+    },
+    {
+      "file": "20260929134545_payment_mail_outbox.sql",
+      "sha256": "0d0674dbb33fb4b74f278e95529d7fa6bcb6e278f2048a7d739662f533717bc8"
+    },
+    {
+      "file": "20261008111841_consistent_site_export.sql",
+      "sha256": "9740ba8f2eab81565e14714f80019c341d3c5871e4441809440288e1bee02be2"
+    },
+    {
+      "file": "20261010053221_avatar_quota_reservations.sql",
+      "sha256": "47081ec1bde6cf33bbba7a65dfea10eb72ba5d3f6d654dc780c8f36587e24726"
+    },
+    {
+      "file": "20261011115340_payment_external_reference.sql",
+      "sha256": "29b7c690bd07a39fa0d3e47b8b08bc6bc57bdb61fffab63d230515a4f69dbbec"
+    },
+    {
+      "file": "20261011144257_enforce_payment_reference_at_settlement.sql",
+      "sha256": "a84f6b6856cd9a956b3b948aa37a57672d2608d52fece69105996c3736d78789"
+    },
+    {
+      "file": "20261013171232_payment_reconcile_claim.sql",
+      "sha256": "209d551ba40a0b8aff7788df51bfca62b0aab625aae256375eb716ba6c85284a"
+    },
+    {
+      "file": "20261015163748_collections_and_admin_queries.sql",
+      "sha256": "3de8007fe1399d4e9abfba32fa75c1002311b87169c7705e1788945ac92223e4"
+    },
+    {
+      "file": "20261015170605_starter_content.sql",
+      "sha256": "37f9a510a922a6065d041f25355dfacd088b93ed838582717d08ef9edd1a3b75"
+    },
+    {
+      "file": "20261016055659_starter_pending_slug_conflicts.sql",
+      "sha256": "c6be096c5f765609c6be0124868cc06647a1f3c062c4428294771d8d9a28084c"
+    },
+    {
+      "file": "20261018061135_media_library.sql",
+      "sha256": "d7bdc5972c5139806958c3addeb7b9afa276ca50be86758356468dd6d22accd6"
+    },
+    {
+      "file": "20261020090813_backend_turnstile_settings.sql",
+      "sha256": "74cb5d35af8614290c058857c38ead272bf41d003016aacee0dd4963c2231d59"
+    },
+    {
+      "file": "20261020110612_private_ai_settings.sql",
+      "sha256": "5d03c53818ae459f8aa2daaf72555f0d7eb02f2cf0d630af0aefd9e79278b393"
+    },
+    {
+      "file": "20261020112058_knowledge_index_generations.sql",
+      "sha256": "51745d70d4c259d55f7f6c4cfbc58c3cc79dde971245df27eae521396e28b025"
+    },
+    {
+      "file": "20261021063700_knowledge_workflow_candidates.sql",
+      "sha256": "4fb9caec016286adf4f17765c731a4c3bc2c97ae0c4cbc1aa0ab30eb678b3035"
+    },
+    {
+      "file": "20261022065829_knowledge_preview_workflow.sql",
+      "sha256": "298f5a69b82cebd7f166a9ed4a60821b116b19c694321254562ddd0662af9903"
+    },
+    {
+      "file": "20261023112358_knowledge_owner_activation.sql",
+      "sha256": "665d4befd5c5a327b6e0385c81083dae37a4e47b6d64653897ae257b1a7eef8e"
+    },
+    {
+      "file": "20261024020015_independent_skills_foundation.sql",
+      "sha256": "53418581bf098426c82036a2e840af600d4991a4fb6d4183a45c7ac45d45f55c"
+    },
+    {
+      "file": "20261024072558_handbook_sync_authority.sql",
+      "sha256": "75c27c5d10481881a5bb7d9e73308cc3e5f9708f5c2076b392b35050dd0782b7"
+    },
+    {
+      "file": "20261024131326_skill_compatibility_and_delivery.sql",
+      "sha256": "a1eb4accac1a31a3fd9f0675cd815528bbe06cf0c2f765e7566e7d895877e34a"
+    },
+    {
+      "file": "20261026184628_series_review_workflow.sql",
+      "sha256": "f74939bfb3f56d1128efae97ad267888d5bbbe3e662b4079155579334e45a9a4"
+    }
+  ],
+  "artifacts": {
+    "baseline.sql": "c2cfa3a36944fb590a585d5b4c1a43b83698a20ed7002afe37c151262e37ca9c",
+    "install.sql": "1539d6a9cd4bacf96b459fb7685b6536a357589239d78647efa2f33979215097",
+    "demo.sql": "bea1e0c534825e7aa655143d136b0b10ff002f17379d707ba9992e1c9c0fa7ec",
+    "verify.sql": "2df5caba35aea927677ac4be946111410ce19204d03ca0dd5c8d9fa2cfe25b94"
+  }
+}

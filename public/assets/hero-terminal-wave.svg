@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="700" viewBox="0 0 1600 700" fill="none">
+  <defs>
+    <radialGradient id="sky" cx=".72" cy=".74" r=".7"><stop stop-color="#163722"/><stop offset=".7" stop-color="#0C170F"/><stop offset="1" stop-color="#0A0F0A"/></radialGradient>
+    <linearGradient id="aurora" x1="630" y1="690" x2="1600" y2="230" gradientUnits="userSpaceOnUse"><stop stop-color="#4ADE80" stop-opacity="0"/><stop offset=".6" stop-color="#4ADE80" stop-opacity=".13"/><stop offset="1" stop-color="#22D3EE" stop-opacity=".18"/></linearGradient>
+    <linearGradient id="line" x1="600" y1="700" x2="1650" y2="130" gradientUnits="userSpaceOnUse"><stop stop-color="#4ADE80" stop-opacity="0"/><stop offset=".65" stop-color="#4ADE80" stop-opacity=".6"/><stop offset="1" stop-color="#22D3EE" stop-opacity=".75"/></linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0v40" stroke="#4ADE80" stroke-opacity=".06"/></pattern>
+  </defs>
+  <path fill="url(#sky)" d="M0 0h1600v700H0z"/>
+  <path fill="url(#grid)" d="M0 0h1600v700H0z"/>
+  <path d="M540 700c250-40 460-130 620-300s300-200 440-195v495Z" fill="url(#aurora)"/>
+  <g stroke="url(#line)" stroke-width="1.2"><path d="M430 710c380-20 620-170 760-330s250-180 450-185"/><path d="M530 730c350-50 610-180 740-340s250-180 450-185"/><path d="M630 750c350-50 610-180 740-340s250-180 450-185"/><path d="M730 770c350-50 610-180 740-340s250-180 450-185"/></g>
+  <circle cx="1355" cy="281" r="3" fill="#FBBF24" fill-opacity=".8"/><circle cx="1191" cy="379" r="3" fill="#4ADE80"/>
+</svg>
