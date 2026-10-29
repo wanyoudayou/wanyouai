@@ -1,5 +1,75 @@
 import { expect, test } from "@playwright/test";
 import type { KnowledgeStatus } from "../../src/lib/ai/knowledge";
+
+for (const theme of ["light", "dark"] as const) for (const width of [320, 1440]) {
+  test(`Avatar Markdown template is opt-in, reversible, and preserves raw form data (${theme}, ${width}px)`, async ({ page }, info) => {
+    const writes: string[] = [];
+    page.on("request", request => { if (request.method() === "POST") writes.push(new URL(request.url()).pathname); });
+    await page.setViewportSize({ width, height: 1000 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+    await page.goto("/admin/ai");
+    const editor = page.getByRole("group", { name: "分身指令编辑器", exact: true });
+    const source = page.getByLabel("分身指令", { exact: true });
+    await expect(source).toHaveValue("使用本站资料回答。");
+    const original = "# 我的角色\n\n**保留这份自定义指令。**\n- 只说明已经提供的能力。";
+    await source.fill(original);
+    await editor.getByRole("button", { name: "载入推荐模板", exact: true }).click();
+    await expect(page.getByRole("group", { name: "确认替换分身指令" })).toBeVisible();
+    await expect(source).toHaveValue(original);
+    await editor.getByRole("button", { name: "保留当前指令", exact: true }).click();
+    await expect(source).toHaveValue(original);
+    await editor.getByRole("button", { name: "载入推荐模板", exact: true }).click();
+    await editor.getByRole("button", { name: "替换当前指令", exact: true }).click();
+    const template = await source.inputValue();
+    expect(template).toMatch(/^# 角色\n/);
+    await expect(editor.getByRole("button", { name: "载入推荐模板", exact: true })).toBeDisabled();
+    await expect(editor).toContainText("推荐模板已载入当前草稿，保存后生效。");
+    await editor.getByRole("tab", { name: "预览", exact: true }).click();
+    const preview = editor.getByRole("region", { name: "分身指令预览" });
+    await expect(preview.getByRole("heading", { name: "角色", exact: true })).toBeVisible();
+    const form = page.locator("form").filter({ has: page.locator('input[name="revision"]') }).first();
+    expect(await form.evaluate(node => new FormData(node as HTMLFormElement).getAll("owner_instructions"))).toEqual([template]);
+    await page.emulateMedia({ colorScheme: theme === "light" ? "dark" : "light" });
+    await expect(preview.getByRole("heading", { name: "角色", exact: true })).toBeVisible();
+    await editor.screenshot({ path: info.outputPath(`instructions-${theme}-${width}.png`) });
+    await editor.getByRole("tab", { name: "编辑", exact: true }).click();
+    await expect(source).toHaveValue(template);
+    await editor.getByRole("button", { name: "撤销载入", exact: true }).click();
+    await expect(source).toHaveValue(original);
+    expect(await form.evaluate(node => new FormData(node as HTMLFormElement).get("owner_instructions"))).toBe(original);
+    expect(writes).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+}
+
+test("An empty instruction can load a template directly and undo to empty without saving", async ({ page }) => {
+  await page.goto("/admin/ai");
+  const source = page.getByLabel("分身指令", { exact: true });
+  await source.fill("");
+  await page.getByRole("button", { name: "载入推荐模板", exact: true }).click();
+  await expect(page.getByRole("group", { name: "确认替换分身指令" })).toHaveCount(0);
+  await expect(source).toHaveValue(/^# 角色\n/);
+  await page.getByRole("button", { name: "撤销载入", exact: true }).click();
+  await expect(source).toHaveValue("");
+});
+
+test("Instruction preview renders Markdown without executing HTML or requesting images", async ({ page }) => {
+  const images: string[] = [];
+  page.on("request", request => { if (request.url().includes("instruction-image.example.test")) images.push(request.url()); });
+  await page.goto("/admin/ai");
+  const raw = '# 角色\n\n**结构化指令**\n\n![不应加载](https://instruction-image.example.test/private.png)\n\n<script>window.instructionPreviewExecuted=true</script>';
+  await page.getByLabel("分身指令", { exact: true }).fill(raw);
+  await page.getByRole("tab", { name: "预览", exact: true }).click();
+  const preview = page.getByRole("region", { name: "分身指令预览" });
+  await expect(preview.getByRole("heading", { name: "角色", exact: true })).toBeVisible();
+  await expect(preview.locator("strong")).toHaveText("结构化指令");
+  await expect(preview.getByRole("img")).toHaveCount(0);
+  expect(images).toEqual([]);
+  expect(await page.evaluate(() => (window as unknown as { instructionPreviewExecuted?: boolean }).instructionPreviewExecuted)).toBeUndefined();
+  const form = page.locator("form").filter({ has: page.locator('input[name="revision"]') }).first();
+  expect(await form.evaluate(node => new FormData(node as HTMLFormElement).get("owner_instructions"))).toBe(raw);
+});
+
 for (const theme of ["light", "dark"] as const) for (const width of [320, 1440]) {
   test(`AI settings: explicit consent and retained fields at ${width}px in ${theme}`, async ({ page }, info) => {
     const errors: string[] = []; const probes: string[] = [];
