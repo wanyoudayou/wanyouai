@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -34,7 +35,7 @@ import {
 import { CardPanel } from "@/components/card/card-panel";
 import { cn } from "@/lib/utils";
 import type { PanelPlaceholder } from "@/types/panel";
-import { TurnstileWidget } from "@/components/shared/turnstile-widget";
+import { TurnstileChallenge } from "@/components/shared/turnstile-challenge";
 
 // 气泡 Markdown 渲染与正文同一管线，按需分包加载（首条分身回复时才拉取）。
 const ChatMarkdown = dynamic(
@@ -62,7 +63,7 @@ interface MentionItem {
 
 interface RightPanelApi {
   available: boolean;
-  ask: (question: string, pins?: string[], turnstileToken?: string) => void;
+  ask: (question: string, pins?: string[]) => Promise<boolean>;
   escalate: (message: string) => void;
   setPlaceholder: (placeholder: PanelPlaceholder) => void;
 }
@@ -77,7 +78,7 @@ export function isAvatarPage(pathname: string): boolean {
 
 const RightPanelContext = createContext<RightPanelApi>({
   available: false,
-  ask: () => {},
+  ask: async () => false,
   escalate: () => {},
   setPlaceholder: () => {},
 });
@@ -159,24 +160,18 @@ function ChatPanel({
   onAsk,
   onEscalate,
   placeholder,
-  needTurnstile,
-  turnstileSiteKey,
   className,
 }: {
   messages: ChatMessage[];
   sending: boolean;
-  onAsk: (question: string, pins: string[], turnstileToken?: string) => void;
+  onAsk: (question: string, pins: string[]) => Promise<boolean>;
   onEscalate: (message: string) => void;
   placeholder: PanelPlaceholder;
-  needTurnstile: boolean;
-  turnstileSiteKey: string | null;
   className?: string;
 }) {
   const [draft, setDraft] = useState("");
   const [chips, setChips] = useState<MentionItem[]>([]);
   const [candidates, setCandidates] = useState<MentionItem[]>([]);
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const [turnstileKey, setTurnstileKey] = useState(0);
   const [escalating, setEscalating] = useState(false);
   const [escalation, setEscalation] = useState("");
   const mentionMatch = /@([^\s@]{0,30})$/.exec(draft);
@@ -214,19 +209,12 @@ function ChatPanel({
     setCandidates([]);
   };
 
-  const submit = () => {
+  const submit = async () => {
     const question = draft.trim();
     if (!question || sending) return;
-    if (needTurnstile && !turnstileToken) return;
-    onAsk(
-      question,
-      chips.map((c) => c.slug),
-      turnstileToken ?? undefined,
-    );
+    if (!(await onAsk(question, chips.map((c) => c.slug)))) return;
     setDraft("");
     setChips([]);
-    setTurnstileToken(null);
-    setTurnstileKey((k) => k + 1); // Turnstile token 一次性，重挂组件取新 token
   };
 
   return (
@@ -280,13 +268,6 @@ function ChatPanel({
             ))}
           </ul>
         )}
-        {needTurnstile && turnstileSiteKey && (
-          <TurnstileWidget
-            key={turnstileKey}
-            siteKey={turnstileSiteKey}
-            onToken={setTurnstileToken}
-          />
-        )}
         {escalating ? (
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">
@@ -325,7 +306,7 @@ function ChatPanel({
         ) : (
           <>
             <ConversationComposer value={draft} onChange={setDraft} onSubmit={submit} disabled={sending}
-              sendDisabled={needTurnstile && !turnstileToken} label="向站主的分身提问" placeholder="向站主的分身提问…（@ 引用站内内容）" maxLength={2000} />
+              label="向站主的分身提问" placeholder="向站主的分身提问…（@ 引用站内内容）" maxLength={2000} />
             <div className="mt-2 flex items-center justify-between gap-2">
               <Button
                 type="button"
@@ -352,12 +333,10 @@ interface PanelState {
   messages: ChatMessage[];
   sending: boolean;
   placeholder: PanelPlaceholder;
-  onAsk: (question: string, pins: string[], turnstileToken?: string) => void;
+  onAsk: (question: string, pins: string[]) => Promise<boolean>;
   onEscalate: (message: string) => void;
   avatarModel: string | null;
   avatarEnabled: boolean;
-  needTurnstile: boolean;
-  turnstileSiteKey: string | null;
 }
 
 const RightPanelStateContext = createContext<PanelState | null>(null);
@@ -429,17 +408,17 @@ function RightPanelContent() {
   const { onAsk } = state;
   const articleSlug = reading?.articleSlug ?? null;
   const ask = useCallback(
-    (question: string, pins: string[], turnstileToken?: string) => {
+    (question: string, pins: string[]) => {
       // 钉载：文章页自动带当前章节 slug（可信来源 = 服务端渲染上下文，不含正文）
       const merged = [...(articleSlug ? [articleSlug] : []), ...pins].slice(
         0,
         4,
       );
       setCollapsed(false);
-      onAsk(question, merged, turnstileToken);
       if (window.innerWidth < 1280) {
         openSheet();
       }
+      return onAsk(question, merged);
     },
     [onAsk, openSheet, articleSlug, setCollapsed],
   );
@@ -492,8 +471,6 @@ function RightPanelContent() {
               onAsk={ask}
               onEscalate={state.onEscalate}
               placeholder={state.placeholder}
-              needTurnstile={state.needTurnstile}
-              turnstileSiteKey={state.turnstileSiteKey}
             />
           </TabsContent>
           <TabsContent
@@ -510,8 +487,6 @@ function RightPanelContent() {
           onAsk={ask}
           onEscalate={state.onEscalate}
           placeholder={state.placeholder}
-          needTurnstile={state.needTurnstile}
-          turnstileSiteKey={state.turnstileSiteKey}
         />
       )}
     </div>
@@ -591,10 +566,16 @@ export function RightPanelProvider({
     kind: "default",
   });
   const [collapsed, setCollapsed] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const requestRunning = useRef(false);
+  const verificationOrigin = useRef<HTMLElement | null>(null);
+  const pendingVerification = useRef<{
+    question: string; pins: string[]; resolve: (accepted: boolean) => void;
+  } | null>(null);
 
   const needTurnstile = !loggedIn && avatarAnonymous && !!turnstileSiteKey;
 
-  const ask = useCallback(
+  const sendQuestion = useCallback(
     async (question: string, pins: string[] = [], turnstileToken?: string) => {
       if (!avatarEnabled) {
         setMessages((prev) => [
@@ -608,6 +589,7 @@ export function RightPanelProvider({
         ]);
         return;
       }
+      requestRunning.current = true;
       setMessages((prev) => [...prev, { role: "user", content: question }]);
       setSending(true);
       try {
@@ -671,11 +653,46 @@ export function RightPanelProvider({
           { role: "avatar", content: "网络异常，请稍后再试。" },
         ]);
       } finally {
+        requestRunning.current = false;
         setSending(false);
       }
     },
     [avatarEnabled],
   );
+
+  const ask = useCallback((question: string, pins: string[] = []): Promise<boolean> => {
+    if (!question.trim() || requestRunning.current || pendingVerification.current) return Promise.resolve(false);
+    if (avatarEnabled && needTurnstile) {
+      verificationOrigin.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      return new Promise(resolve => {
+        pendingVerification.current = { question, pins: [...pins], resolve };
+        setVerifying(true);
+      });
+    }
+    void sendQuestion(question, pins);
+    return Promise.resolve(true);
+  }, [avatarEnabled, needTurnstile, sendQuestion]);
+
+  const cancelVerification = useCallback(() => {
+    const pending = pendingVerification.current;
+    pendingVerification.current = null;
+    setVerifying(false);
+    pending?.resolve(false);
+  }, []);
+
+  const finishVerification = useCallback((token: string) => {
+    const pending = pendingVerification.current;
+    if (!pending || !token) return;
+    pendingVerification.current = null;
+    setVerifying(false);
+    void sendQuestion(pending.question, pending.pins, token);
+    pending.resolve(true);
+  }, [sendQuestion]);
+
+  useEffect(() => () => {
+    pendingVerification.current?.resolve(false);
+    pendingVerification.current = null;
+  }, []);
 
   const escalate = useCallback(async (message: string) => {
     setMessages((prev) => [
@@ -724,11 +741,15 @@ export function RightPanelProvider({
             onEscalate: escalate,
             avatarModel,
             avatarEnabled,
-            needTurnstile,
-            turnstileSiteKey,
           }}
         >
           {children}
+          {verifying && turnstileSiteKey && <TurnstileChallenge
+            siteKey={turnstileSiteKey}
+            onVerified={finishVerification}
+            onCancel={cancelVerification}
+            onRestoreFocus={() => { if (verificationOrigin.current?.isConnected) verificationOrigin.current.focus(); }}
+          />}
         </RightPanelStateContext.Provider>
       </RightPanelContext.Provider>
     </RightPanelCollapseContext.Provider>

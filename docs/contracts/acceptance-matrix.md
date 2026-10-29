@@ -4,6 +4,8 @@
 
 人机校验由 `/admin/security` 管理。`tests/admin-turnstile.test.ts` 覆盖站主专用保存、配置与密钥同事务、并发版本冲突、换 Site Key 须换配套密钥、停用覆盖旧变量、公开配置无 Secret Key、固定 hostname／action 校验及上游失败关闭。真实挑战仍须在固定站点域名人工完成；不能以合成响应替代。
 
+`tests/browser/security-settings.spec.ts` 验证匿名 AI 发送才弹窗、成功自动发送并收起、每次发送使用新挑战、取消保留输入、失败可手动重试，以及首页快捷提问、手机抽屉与登录免挑战。合成 Cloudflare 响应不代表真实挑战通过。
+
 | 场景 | 必须满足 |
 |---|---|
 | 匿名或普通账户访问部署诊断 | 在读取环境、创建权威客户端或探测远端前拒绝 |

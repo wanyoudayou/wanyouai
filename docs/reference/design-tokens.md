@@ -56,6 +56,7 @@ Lucide 控件图标使用 12/14/16/20px、stroke 2，小尺寸可 1.5；辅助�
 |---|---|---|
 | `ThemeProvider` / `ThemeToggle` | 顶层主题与单 pill 循环切换；服务器占位稳定，挂载前禁用，偏好不混入业务数据 | §0 / §4 |
 | `TurnstileWidget` | 分身与询价共用紧凑控件；固定操作类型、过期清空、单次提交后重置；跟随本站浅深主题，切换后重新挑战且保留表单 | 安全与人机校验 |
+| `TurnstileChallenge` | 匿名分身发送时按需打开居中弹窗；通过即关闭并继续该次发送，取消保留原输入；加载失败可手动重试，键盘焦点回到发送入口 | 安全与人机校验 |
 | `NavigationRail` / `MobileNavigation` | 共享导航来源、平板图标栏与手机底导航、抽屉互斥 | §4 |
 | `ContentCard` | 共边 120px 封面、12px 内容间距、14px 加粗标题与 11px 元信息；四类内容卡共用原稿默认/hover/pressed状态，不修改ui原语 | §3 / §5 |
 | `PricingPlans` / `PricingFeatureList` | 三列方案 + 服务询价横条；label13→price30/period12→分隔→Lucide功能列表→全宽pill CTA；真实配置决定价格与动作 | §5 / 自定义页面契约 |

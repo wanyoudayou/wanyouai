@@ -19,11 +19,12 @@ export function HeroAskBox({
   const [draft, setDraft] = useState("");
   const { ask, available } = useRightPanel();
 
-  const submit = () => {
+  const submit = async () => {
     const question = draft.trim();
     if (!question) return;
-    ask(question);
+    if (!(await ask(question))) return;
     setDraft("");
+    window.dispatchEvent(new Event("wanyou:open-reading-panel"));
   };
 
   if (!available) return null;
