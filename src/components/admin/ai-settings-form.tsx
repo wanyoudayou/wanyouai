@@ -5,10 +5,11 @@ import { BotIcon, BookOpenIcon, FileCodeIcon, PlugIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { AI_TARGETS } from "@/lib/ai/connections";
-import { AVATAR_FIXED_POLICY, DEFAULT_AVATAR_INSTRUCTIONS } from "@/lib/ai/policy";
+import { AVATAR_FIXED_POLICY } from "@/lib/ai/policy";
 import type { AISettingsView } from "@/lib/ai/settings";
 import { saveAISettings, migrateLegacyAI } from "@/app/admin/ai/actions";
 import { KnowledgeIndexPanel } from "@/components/admin/knowledge-index-panel";
+import { AvatarInstructionEditor } from "@/components/admin/avatar-instruction-editor";
 
 const selectClass = "h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 function draftFromView(view: AISettingsView) {
@@ -94,8 +95,7 @@ export function AISettingsForm({ initial }: { initial: AISettingsView }) {
           <h2 className="flex items-center gap-2 font-semibold"><BotIcon className="size-4" />站主分身</h2>
           <label className="flex items-center gap-2 text-sm"><input name="avatar_enabled" type="checkbox" checked={draft.enabled} onChange={event => patch({ enabled: event.target.checked })} />启用知识库分身（连接和索引就绪后才对外开放）</label>
           <label className="flex items-center gap-2 text-sm"><input name="anonymous_entry" type="checkbox" checked={draft.anonymous} onChange={event => patch({ anonymous: event.target.checked })} />允许匿名提问（另需<a className="text-primary underline" href="/admin/security">人机校验</a>）</label>
-          <div className="space-y-2 text-sm"><label htmlFor="ai-owner-instructions">分身指令</label><textarea id="ai-owner-instructions" name="owner_instructions" rows={6} maxLength={8000} className="w-full rounded-md border border-input bg-background p-3 text-sm" value={draft.instructions} onChange={event => patch({ instructions: event.target.value })} /></div>
-          <Button type="button" variant="outline" onClick={() => patch({ instructions: DEFAULT_AVATAR_INSTRUCTIONS })}>恢复默认指令</Button>
+          <AvatarInstructionEditor value={draft.instructions} savedValue={view.ownerInstructions} onChange={instructions => patch({ instructions })} disabled={pending} />
           <details className="text-sm"><summary className="cursor-pointer text-muted-foreground">固定规则（不可编辑）</summary><p className="mt-2 leading-6">{AVATAR_FIXED_POLICY}</p></details>
           <label className="block space-y-2 text-sm">每月生成次数上限（分身、页面、出题与回答预演合计；留空不设上限）<Input name="monthly_limit" type="number" min={0} max={1000000} value={draft.limit} onChange={event => patch({ limit: event.target.value })} /></label>
         </section>
