@@ -1,4 +1,4 @@
-import { generateText, streamText, stepCountIs, type LanguageModelUsage } from "ai";
+import { generateText, streamText, stepCountIs, Output, jsonSchema, type JSONSchema7, type LanguageModelUsage } from "ai";
 import { AIError, list, object, tokenCount, type AIConnection } from "./connections";
 import type { AITransport } from "./transport";
 import { generationModel, providerError } from "./sdk";
@@ -25,12 +25,18 @@ function envelope(protocol: AIConnection["protocol"], value: unknown) {
 
 export async function generate(connection: AIConnection, messages: AIMessage[], options: {
   signal: AbortSignal; maxTokens: number; onToken?: (delta: string) => void; transport?: AITransport;
+  jsonSchema?: JSONSchema7;
 }): Promise<GenerationResult> {
   if (connection.purpose !== "generation") throw new AIError("INVALID_CONNECTION_PURPOSE");
   if (!messages.length || messages.some(item => !["system", "user", "assistant"].includes(item.role) || typeof item.content !== "string")) throw new AIError("INVALID_GENERATION_INPUT");
+  if (options.jsonSchema && options.onToken) throw new AIError("INVALID_GENERATION_INPUT");
   const controller = new AbortController();
   const signal = AbortSignal.any([options.signal, controller.signal]);
   try {
+    let providerOptions: Parameters<typeof generateText>[0]["providerOptions"];
+    if (connection.protocol === "responses") providerOptions = { openai: { store: false } };
+    else if (connection.protocol === "chat" && connection.baseUrl === "https://api.openai.com/v1") providerOptions = { openai: { systemMessageMode: "system" } };
+    else if (connection.protocol === "messages" && options.jsonSchema) providerOptions = { anthropic: { structuredOutputMode: "outputFormat" } };
     const settings = {
       model: generationModel(connection, signal, options.transport),
       messages: connection.protocol === "chat" ? messages : messages.filter(item => item.role !== "system"),
@@ -38,14 +44,21 @@ export async function generate(connection: AIConnection, messages: AIMessage[], 
       allowSystemInMessages: true,
       maxOutputTokens: options.maxTokens, maxRetries: 0, abortSignal: signal,
       stopWhen: stepCountIs(1), telemetry: { isEnabled: false },
-      providerOptions: connection.protocol === "responses" ? { openai: { store: false } } : connection.protocol === "chat" && connection.baseUrl === "https://api.openai.com/v1" ? { openai: { systemMessageMode: "system" } } : undefined,
+      // Chat/Responses request JSON mode; Messages needs a schema and native format.
+      // Force native output so the SDK cannot substitute an implicit JSON tool.
+      output: options.jsonSchema ? connection.protocol === "messages" ? Output.object({ schema: jsonSchema(options.jsonSchema) }) : Output.json() : undefined,
+      providerOptions,
     };
     if (!options.onToken) {
       const result = await generateText({ ...settings, include: { responseBody: true } });
       envelope(connection.protocol, result.response.body);
       completed(result.finishReason, result.text);
       if (result.content.some(part => !["text", "reasoning"].includes(part.type))) throw new AIError("UNSUPPORTED_GENERATION_OUTPUT");
-      return { content: result.text, usage: usage(result.usage) };
+      // The SDK parses JSON; callers still validate actions, paths and authority.
+      const content = options.jsonSchema ? JSON.stringify(result.output) : result.text;
+      if (typeof content !== "string") throw new AIError("INVALID_STRUCTURED_OUTPUT");
+      completed(result.finishReason, content);
+      return { content, usage: usage(result.usage) };
     }
     const result = streamText({ ...settings, includeRawChunks: true, onError() {} });
     let content = ""; let finished = false; let counts: GenerationResult["usage"] | undefined;
