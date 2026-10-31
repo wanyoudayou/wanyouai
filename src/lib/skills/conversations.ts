@@ -46,7 +46,7 @@ export async function submitSkillTurn(input: { user: string; skill: number; sess
       const inspected = await readSkillPackage(release);
       const previous = await db.from("skill_turns").select("question,answer").eq("session_id", input.session).eq("state", "succeeded").order("created_at").order("id").limit(30);
       if (previous.error) throw new SkillError("对话历史暂时无法读取。");
-      const history: AIMessage[] = previous.data.flatMap(t => [{ role: "user" as const, content: t.question }, { role: "assistant" as const, content: JSON.stringify({ answer: t.answer }) }]);
+      const history: AIMessage[] = previous.data.flatMap(t => [{ role: "user" as const, content: t.question }, { role: "assistant" as const, content: t.answer! }]);
       return runTextSkill({ connection, texts: inspected.texts, history, question: input.question, signal,
         authorize: () => authorizeOnline(input.skill, input.user),
         call: operation => {
