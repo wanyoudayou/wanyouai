@@ -8,6 +8,7 @@ import { withinSignal } from "@/lib/avatar/deadline";
 import { canUseSkill } from "./access";
 import { readSkillPackage, readSkillRelease } from "./storage";
 import { runTextSkill } from "./runner";
+import { skillTurnFailure } from "./diagnostics";
 import { SkillError } from "./types";
 
 async function authorizeOnline(skill: number, user: string) {
@@ -33,6 +34,7 @@ export async function submitSkillTurn(input: { user: string; skill: number; sess
   if (begin.error || !begin.data) throw new SkillError(begin.error?.message.includes("SESSION_FULL") ? "此对话已达到 30 轮，请新建对话。" : "对话无法开始：请确认使用权限，或等待上一轮结束。", 409);
   if (!begin.data.new) return { id: input.id, state: begin.data.state, answer: begin.data.answer };
   let dispatched = false;
+  const callIds: string[] = [];
   try {
     const answer = await withinSignal((async () => {
       const release = await readSkillRelease(begin.data.release);
@@ -47,7 +49,10 @@ export async function submitSkillTurn(input: { user: string; skill: number; sess
       const history: AIMessage[] = previous.data.flatMap(t => [{ role: "user" as const, content: t.question }, { role: "assistant" as const, content: JSON.stringify({ answer: t.answer }) }]);
       return runTextSkill({ connection, texts: inspected.texts, history, question: input.question, signal,
         authorize: () => authorizeOnline(input.skill, input.user),
-        call: operation => withAICall(db, { id: randomUUID(), task: "skill", connectionId: connection.id, userId: input.user }, async () => { signal.throwIfAborted(); dispatched = true; const result = await operation(); return { value: result, usage: result.usage }; }),
+        call: operation => {
+          const id = randomUUID(); callIds.push(id);
+          return withAICall(db, { id, task: "skill", connectionId: connection.id, userId: input.user }, async () => { signal.throwIfAborted(); dispatched = true; const result = await operation(); return { value: result, usage: result.usage }; });
+        },
       });
     })(), signal);
     await authorizeOnline(input.skill, input.user);
@@ -55,8 +60,8 @@ export async function submitSkillTurn(input: { user: string; skill: number; sess
     if (saved.error || !saved.data?.length) throw new SkillError("回答保存结果未知，请查询本轮状态。");
     return { id: input.id, state: "succeeded", answer };
   } catch (error) {
+    const failure = skillTurnFailure(error, { turnId: input.id, callIds, dispatched, signal });
     await db.from("skill_turns").update({ state: dispatched ? "unknown" : "failed" }).eq("id", input.id).eq("session_id", input.session).eq("state", "running");
-    if (error instanceof SkillError) throw error;
-    throw new SkillError(dispatched ? "本轮未完成，已派发调用可能计费；不会自动重试。可查询状态或重新提问。" : "模型暂时不可用或额度不足，本轮未生成回答。", 503);
+    throw failure;
   }
 }

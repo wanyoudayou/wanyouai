@@ -70,6 +70,7 @@ export function providerError(error: unknown, signal?: AbortSignal): AIError {
   let cause = error;
   for (let depth = 0; depth < 6 && cause; depth++) {
     if (cause instanceof AIError) return cause;
+    if (object(cause).name === "AI_NoObjectGeneratedError") return new AIError("INVALID_STRUCTURED_OUTPUT");
     if (["AI_NoOutputGeneratedError", "AI_NoContentGeneratedError"].includes(String(object(cause).name))) return new AIError("GENERATION_INCOMPLETE");
     cause = object(cause).cause;
   }

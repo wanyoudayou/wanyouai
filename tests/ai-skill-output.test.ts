@@ -54,6 +54,7 @@ for (const [protocol, baseUrl] of targets) {
       return Response.json(response(protocol, "PRIVATE_PROVIDER_TEXT not json synthetic-key-only"));
     } }), error => {
       assert(error instanceof AIError);
+      assert.equal(error.code, "INVALID_STRUCTURED_OUTPUT");
       assert.doesNotMatch(String(error), /PRIVATE_PROVIDER_TEXT|synthetic-key-only/);
       return true;
     });
