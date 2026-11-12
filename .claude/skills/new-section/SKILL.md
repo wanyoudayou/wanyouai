@@ -64,3 +64,7 @@ plus `npx playwright test <new spec>` when you added one.
 ## Hand-off
 
 With the user's go-ahead: create a branch `section/<name>`, commit only the section directory, its thin route, `src/generated/sections.json`, generated token CSS, any browser test and (extended) `package.json`/`package-lock.json`, then open a PR whose description lists tier, owned packages with licences, and the measured budget. After it is merged and deployed, the owner adds the section in `/admin/navigation`, chooses free / login / subscriber access, and enables it.
+
+## Repository sync
+
+When the site keeps section source in a private development repository and publishes a separate public copy, the merge above changes only the development repository. To update the public copy (after a new, migrated or removed section, or any other merged change), follow "同步公开仓库" in `docs/development/releasing.md`: export with `node scripts/export-public.mjs <public clone>`, review the diff, run `npm ci` and the gates in the public clone, then commit and push there. The export strips every section, its tests, routes and owned packages, and fails on leftover references; fix those in the development repository and export again, never by editing the public clone. Releases are packaged in the public clone, as that document describes. Pushing to the public repository is outward-facing: do it only with the user's go-ahead.

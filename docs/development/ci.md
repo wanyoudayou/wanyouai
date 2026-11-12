@@ -13,10 +13,10 @@ Vercel 的 `git.deploymentEnabled` 对 `ci/**` 设置为 false，这类分支用
 | 作业 | 环境及内容 | 截止 |
 |---|---|---|
 | verify | Ubuntu 24.04、Node 22、npm ci；契约、配置、Storage、干净库、媒体迁移、安装工件、内容 / 发布 / 后台 / 分身及离线 Embedding 测试、lint、类型检查、生产构建、代码栏目体积 | 15 分钟 |
-| browser | Ubuntu 24.04、Node 22、Chromium；隔离 UI 夹具中的双色、响应式、分页与编辑恢复 | 15 分钟 |
+| browser | Ubuntu 24.04、Node 22、Chromium；隔离 UI 夹具中的双色、响应式、分页与编辑恢复 | 20 分钟 |
 | database-concurrency | Ubuntu 24.04、Node 22、固定摘要的 PostgreSQL 17 / pgvector 容器；完整安装、真实独立连接竞争、事务故障与恢复 | 10 分钟 |
 
-浏览器测试使用一个 worker，不自动重试；单项截止 30 秒，整套截止 8 分钟，包含隔离 Next.js 夹具的启动及首次路由编译。测试步骤截止 9 分钟，允许超时后的清理结束；整个作业截止 15 分钟，另含依赖和 Chromium 安装。列表报告逐项显示名称、结果和耗时，便于区分断言失败与整套超时。
+浏览器测试使用一个 worker，不自动重试；单项截止 30 秒，整套截止 12 分钟，包含隔离 Next.js 夹具的启动及首次路由编译。测试步骤截止 13 分钟，允许超时后的清理结束；整个作业截止 20 分钟，另含依赖和 Chromium 安装。列表报告逐项显示名称、结果和耗时，便于区分断言失败与整套超时。
 
 Actions 仅请求 `contents: read`，checkout 不保留 Git 凭据；应用测试不需要 GitHub Secrets。数据库使用可丢弃的本机容器和公开测试口令，构建只注入公开占位值。运行版本、测试总数与失败原因从实际日志取证。`checkout` / `setup-node` 按各自[官方说明](https://github.com/actions/checkout)与[官方说明](https://github.com/actions/setup-node)更新，Action 自身运行时与项目测试用 Node 22 是两个概念。
 

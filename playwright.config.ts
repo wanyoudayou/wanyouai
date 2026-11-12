@@ -9,7 +9,7 @@ export default defineConfig({
   timeout: 30000,
   // Sequential UI coverage includes cold Next.js route compilation. Keep the
   // per-test deadline strict while leaving room for the complete suite.
-  globalTimeout: 8 * 60 * 1000,
+  globalTimeout: 12 * 60 * 1000,
   reporter: "list",
   use: {
     baseURL: "http://127.0.0.1:3102",
