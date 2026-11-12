@@ -32,7 +32,7 @@ export function listSections(root) {
   return { names, packages: [...new Set(packages)].sort() };
 }
 
-/** Paths a section owns besides its directory and thin route (convention for browser tests). */
+/** Browser specs a section owns besides its directory, thin route and fixture route (naming convention). */
 function ownedTests(root, name) {
   const dir = path.join(root, "tests/browser");
   if (!existsSync(dir)) return [];
@@ -55,6 +55,7 @@ export function stripSections(root) {
   for (const name of names) {
     remove(`src/sections/${name}`);
     remove(`src/app/lab/${name}`);
+    remove(`tests/browser/fixture/app/lab/${name}`);
     for (const file of ownedTests(root, name)) remove(file);
   }
   remove("src/generated/sections");

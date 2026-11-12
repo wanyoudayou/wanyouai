@@ -28,6 +28,8 @@ test("export removes every section, its route, tokens, browser tests and owned p
     "src/app/lab/charts/[[...rest]]/page.tsx": 'import "@/generated/sections/charts.tokens.css";\n',
     "src/generated/sections/charts.tokens.css": "[data-section=\"charts\"] {}\n",
     "tests/browser/section-demo.spec.ts": 'test("demo", async ({ page }) => page.goto("/lab/demo"));\n',
+    "tests/browser/fixture/app/lab/demo/[[...rest]]/page.tsx": 'import Root from "@/sections/demo/page";\n',
+    "tests/browser/fixture/app/lab/fixture-lab/[[...rest]]/page.tsx": "export default function Lab() { return null; }\n",
     "tests/browser/navigation.spec.ts": "// unrelated\n",
     "src/lib/keep.ts": "export const keep = 1;\n",
   });
@@ -36,9 +38,9 @@ test("export removes every section, its route, tokens, browser tests and owned p
     const result = stripSections(root);
     assert.deepEqual(result.names, ["charts", "demo"]);
     assert.deepEqual(result.packages, ["fancy-chart"]);
-    for (const gone of ["src/sections/demo", "src/sections/charts", "src/app/lab", "src/generated/sections", "tests/browser/section-demo.spec.ts"])
+    for (const gone of ["src/sections/demo", "src/sections/charts", "src/app/lab", "src/generated/sections", "tests/browser/section-demo.spec.ts", "tests/browser/fixture/app/lab/demo"])
       assert.equal(existsSync(path.join(root, gone)), false, gone);
-    for (const kept of ["src/sections/_sdk/index.ts", "tests/browser/navigation.spec.ts", "src/lib/keep.ts"])
+    for (const kept of ["src/sections/_sdk/index.ts", "tests/browser/navigation.spec.ts", "src/lib/keep.ts", "tests/browser/fixture/app/lab/fixture-lab"])
       assert.equal(existsSync(path.join(root, kept)), true, kept);
     const pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
     assert.deepEqual(Object.keys(pkg.dependencies), ["react", "lucide-react"]);

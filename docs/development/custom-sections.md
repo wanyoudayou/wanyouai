@@ -107,7 +107,7 @@ node scripts/export-public.mjs <目标目录> [--ref HEAD]
 ```
 
 - 目标为空目录，或公开仓库的干净克隆（保留 `.git`，其余内容整体替换，供审阅后在那里提交）。工具读取已提交的 `--ref`，不改动当前仓库的工作区与索引，也不受 `export-ignore` 影响。
-- 删除每个栏目的目录、`/lab/<name>` 薄路由、生成的栏目变量 CSS 与浏览器测试（`tests/browser/<name>.spec.ts` 或 `section-<name>*.spec.ts`），重新生成空登记表；栏目在 manifest 登记的独占依赖从 `package.json` 移除并重新生成 `package-lock.json`。
+- 删除每个栏目的目录、`/lab/<name>` 薄路由、生成的栏目变量 CSS、浏览器测试（`tests/browser/<name>.spec.ts` 或 `section-<name>*.spec.ts`）与夹具路由 `tests/browser/fixture/app/lab/<name>/`，重新生成空登记表；栏目在 manifest 登记的独占依赖从 `package.json` 移除并重新生成 `package-lock.json`。
 - 导出后扫描对已删除栏目（`@/sections/<name>`、`/lab/<name>`、登记名）与独占依赖的引用，仍有引用则失败并列出文件；在源仓库消除引用后重新导出。
 - 在导出目录执行 `npm ci` 与提交前门槛后再提交到公开仓库。
 - 仓库私有只保护源码。栏目的客户端代码与其中的数据仍会下发到有权访问页面的浏览器（生产构建不含 source map），导航访问设置也不保护静态脚本；不能被提取的内容需留在服务端按步骤下发。

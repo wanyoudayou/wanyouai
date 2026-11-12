@@ -115,7 +115,7 @@ Lucide 控件图标使用 12/14/16/20px、stroke 2，小尺寸可 1.5；辅助�
 | `EventDetailsForm` | 活动时间、地点、报名说明、名额、会员类型与票价；活动状态单向流转；保存验证及并发冲突提示 | 3.13 |
 | `SeriesSettingsForm` / `SeriesPublication` | 专辑统一设置；元数据清单、选择范围、分页、预览右栏、整批确认、原任务查询与重试；正文与权限变更由站主确认 | 3.13 |
 | `NavigationManager` | 后台导航编辑：列表行 = 图标 + 名称 Input + 图标 select + 类型 StatusBadge(neutral) + 目标地址 + 问题 StatusBadge(warning)，右侧访问级别（仅代码栏目）、启用、上移 / 下移 / 移除图标按钮；“添加导航”卡按类型切换字段；底部吸附保存栏（保存 / 放弃修改 / 状态） | 3.13 |
-| 栏目 SDK（`@/sections/_sdk`） | 代码栏目唯一可用的主站界面：再导出 Button / Input / Badge / Card / Separator / Skeleton / Tabs、StatusBadge、Callout、EmptyState，提供 `SectionHeader`（与站点同级标题区）、`SectionBody`、`usePersistentState`（带栏目前缀的本机存储）。栏目样式只用 token；扩展档变量限定在 `[data-section="<name>"]` 作用域并同时定义浅深值 | 3.16 |
+| 栏目 SDK（`@/sections/_sdk`） | 代码栏目唯一可用的主站界面：再导出 Button / Input / Badge / Card / Dialog / Separator / Skeleton / Tabs、StatusBadge、Callout、EmptyState，提供 `SectionHeader`（与站点同级标题区）、`SectionBody`、`usePersistentState`（带栏目前缀的本机存储，同页同键组件与其他标签页在写入后同步）。栏目样式只用 token；扩展档变量限定在 `[data-section="<name>"]` 作用域并同时定义浅深值 | 3.16 |
 | `SeriesCreateForm` / `ContentControls` | 先选类型（手册 / 活动卡片单选）再按类型显示字段的草稿创建；README 选择与上架；暂停 / 恢复 / 归档确认；操作反馈与并发更新检查；文章类附「编辑内容」入口（/admin/content?article=id 装载）。复用 Input / Button 与原生 select | 3.13 |
 | `AdminLoginForm` / `AdminDashboard` | 站主 magic link 表单、无权限态、独立加载的指标卡和常用入口；复用 Input / Button 与语义列表 | 3.13 |
 | `AdminDataTable` / `AdminResourcePage` | TanStack 受控服务端表格、筛选工具栏、手机摘要卡、20/50/100 分页和错误状态 | 3.13 |
