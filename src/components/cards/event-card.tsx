@@ -1,3 +1,4 @@
+import { GeneratedCover } from "@/components/cards/generated-cover";
 import { CalendarDaysIcon, MapPinIcon } from "lucide-react";
 
 import {
@@ -6,7 +7,7 @@ import {
   ContentCardChip,
 } from "@/components/cards/content-card";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { formatDateTime, formatPrice } from "@/lib/format";
+import { formatDateTime, formatTicketPrice } from "@/lib/format";
 import type { EventCardData } from "@/types/content";
 
 const STATE_META = {
@@ -32,9 +33,7 @@ export function EventCard({
           // eslint-disable-next-line @next/next/no-img-element -- Cover is hosted or configured by the site owner.
           <img src={data.coverUrl} alt="" className="opc-content-card-image" />
         ) : (
-          <div className="opc-content-card-placeholder" aria-hidden>
-            <CalendarDaysIcon className="size-5" />
-          </div>
+          <GeneratedCover title={data.title} Icon={CalendarDaysIcon} />
         )}
         <ContentCardChip>{data.tags[0] ?? "活动"}</ContentCardChip>
       </div>
@@ -64,9 +63,7 @@ export function EventCard({
           <span className="opc-content-card-meta">
             {data.memberOnly
               ? "会员专享"
-              : data.ticketPrice === null || data.ticketPrice === 0
-                ? "免费参加"
-                : formatPrice(data.ticketPrice, currency)}
+              : formatTicketPrice(data.ticketPrice, currency, "")}
           </span>
           <ContentCardAction>查看活动</ContentCardAction>
         </div>

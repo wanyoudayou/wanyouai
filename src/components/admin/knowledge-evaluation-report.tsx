@@ -22,7 +22,7 @@ export function KnowledgeEvaluationReport({ detail, disabled, onEdit, draftCases
   const pages = Math.max(1, Math.ceil(selected.length / 5)); const currentPage = Math.min(page, pages);
   return <section aria-label="检索验收结果" className="space-y-4 text-sm">
     <div className="space-y-2">
-      <StatusBadge tone={complete ? "registered" : "paused"}>{complete ? "检查完成 · 仅供参考" : "检查尚未完成"}</StatusBadge>
+      <StatusBadge tone={complete ? "info" : "warning"}>{complete ? "检查完成 · 仅供参考" : "检查尚未完成"}</StatusBadge>
       <h4 className="font-semibold">查看错配与遗漏，启用由你决定</h4>
       <p>已检查 {detail.results.length}/{detail.cases.length} 个问题。</p>
       {detail.issue && <p>{evaluationIssue(detail.issue)}</p>}
@@ -46,7 +46,7 @@ export function KnowledgeEvaluationReport({ detail, disabled, onEdit, draftCases
         const draft = draftCases ? draftCases.find(value => value.question === item.question) : item;
         return <li key={row.index} className={cn("min-w-0 space-y-2", row.problem ? "rounded-lg border border-warning/50 bg-warning/5 p-4" : "border-b pb-4")}>
           <p className="font-medium">问题 {row.index + 1}：{item.question}</p>
-          {row.problem ? <StatusBadge tone="paused"><TriangleAlertIcon aria-hidden />{row.label}</StatusBadge> : <p>{row.label}</p>}
+          {row.problem ? <StatusBadge tone="warning"><TriangleAlertIcon aria-hidden />{row.label}</StatusBadge> : <p>{row.label}</p>}
           <p className="break-words text-muted-foreground">你指定的答案来源：{item.expected.map(target => sourceTitle(target, detail.sourceTitles)).join("、") || "本站没有答案"}</p>
           <p>{finding.thresholdKnown ? "筛选后的来源" : "待筛选的候选来源"}：{!row.matches.length && "没有"}</p>
           {row.matches.length > 0 && <ul aria-label={`问题 ${row.index + 1} 的检索来源`} className="space-y-2">{row.matches.map(match => <li key={match.target} className="flex min-w-0 flex-wrap items-center gap-2">

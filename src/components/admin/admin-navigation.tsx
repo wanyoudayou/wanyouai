@@ -22,8 +22,9 @@ const groups = [
     Icon: BookOpenIcon,
     links: [
       ["文章", "/admin/articles"],
-      ["专辑", "/admin/collections"],
-      ["SKILL", "/admin/skills"],
+      ["手册", "/admin/collections"],
+      ["活动", "/admin/events"],
+      ["技能", "/admin/skills"],
       ["独立页面", "/admin/pages"],
       ["素材库", "/admin/media"],
       ["Obsidian 连接", "/admin/handbooks/connect"],
@@ -43,7 +44,8 @@ const groups = [
     title: "站点设置",
     Icon: SettingsIcon,
     links: [
-      ["首页与导航", "/admin/settings"],
+      ["站点配置", "/admin/settings"],
+      ["导航", "/admin/navigation"],
       ["站主名片", "/admin/card"],
       ["AI 设置", "/admin/ai"],
       ["安全与人机校验", "/admin/security"],

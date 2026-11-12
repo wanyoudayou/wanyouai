@@ -58,3 +58,14 @@ test('avatar: URL 构造覆盖各类专辑',()=>{
   for(const [type,path] of [['handbook','handbooks'],['skill','skills'],['collection','handbooks']] as const)
     assert.equal(articleUrl(articleRow({slug:'c',type:'chapter'}),seriesRow({slug:'demo',type})),`/${path}/demo?article=c`);
 });
+
+test("gateHits: a readme chunk that is not this series' public README is gated like body", async () => {
+  const { gateHits } = await import("../src/lib/avatar/retrieve");
+  const reader = { userId: null, owner: false, entitlements: [] };
+  const series = { id: 2, slug: "guide", type: "handbook", status: "published", readme_article_id: 1 } as never;
+  const paidChapter = { id: 5, slug: "paid", title: "付费章节", type: "chapter", series_id: 2, access: "paid", status: "published", preview_md: "" } as never;
+  const hit = { chunk_id: 9, article_id: 5, series_id: 2, access: "paid", chunk_type: "readme", chunk_no: 0, content: "SECRET PAID BODY" };
+  const [gated] = gateHits([hit], reader, new Map([[5, paidChapter]]), new Map([[2, series]]));
+  assert.equal(gated.gated, true);
+  assert.equal(gated.content.includes("SECRET PAID BODY"), false);
+});

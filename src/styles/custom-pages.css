@@ -126,9 +126,8 @@
   border-radius: var(--radius-lg);
   padding: 1.5rem;
 }
+/* 颜色由 .custom-html-body .cp-inverse 的 token 重映射统一提供（所有渲染路径都包在 .custom-html-body 内）；这里只定义版式。 */
 .cp-inverse {
-  background: var(--foreground);
-  color: var(--background);
   border-radius: var(--radius-lg);
   padding: 1.5rem;
 }
@@ -139,7 +138,7 @@
 .cp-inverse .cp-muted,
 .cp-inverse .cp-lead,
 .cp-inverse .cp-small {
-  color: color-mix(in oklab, var(--background) 70%, transparent);
+  color: var(--muted-foreground);
 }
 
 /* 卡片型内容（自定义页/名片区通用）：全图链接卡、社交媒体卡 */
@@ -153,7 +152,7 @@
   color: inherit;
 }
 .cp-link-cover:hover {
-  box-shadow: var(--shadow-sm, 0 1px 2px rgb(0 0 0 / 0.06));
+  box-shadow: var(--opc-hover-glow);
 }
 /* 整图无边距（参考 dinq 照片卡）：图即链接；图片保持原始比例不裁切 */
 .cp-link-cover img {

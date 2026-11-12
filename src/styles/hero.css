@@ -6,6 +6,9 @@
   width: 100%;
   color: var(--foreground);
   background: var(--background);
+  --opc-hero-p: 0;
+  --opc-hero-shift: 0px;
+  --opc-hero-pad-bottom: 56px;
 }
 .opc-hero__art {
   position: absolute;
@@ -48,7 +51,7 @@
   gap: 18px;
   max-width: 960px;
   margin-inline: auto;
-  padding: 64px 40px 56px;
+  padding: 64px 40px var(--opc-hero-pad-bottom);
   text-align: center;
 }
 .opc-hero__content h1 {
@@ -98,8 +101,11 @@
   color: var(--muted-foreground);
 }
 @media (max-width: 767px) {
+  .opc-hero {
+    --opc-hero-pad-bottom: 42px;
+  }
   .opc-hero__content {
-    padding: 42px 24px;
+    padding: 42px 24px var(--opc-hero-pad-bottom);
     gap: 18px;
   }
   .opc-hero__content h1 {
@@ -107,5 +113,44 @@
   }
   .opc-hero__focus {
     font-size: 12px;
+  }
+}
+
+/*
+ * Scroll compression, enabled by HeroCollapse once it has measured the hero.
+ * --opc-hero-p runs 0 (full) → 1 (only the ask box bar is left under the shell
+ * header); --opc-hero-shift is how far the hero has scrolled. The section keeps
+ * its full height in flow and sticks with a negative top, so nothing reflows.
+ */
+.opc-hero[data-collapse] {
+  position: sticky;
+  top: var(--opc-hero-top, 0px);
+  z-index: 20;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--border) calc(var(--opc-hero-p) * 100%), transparent);
+}
+/* Artwork moves at half speed and keeps covering the visible part of the hero. */
+.opc-hero[data-collapse] .opc-hero__art {
+  translate: 0 calc(var(--opc-hero-shift) * 0.5);
+}
+/* Badges and the focus line fade first, then the title shrinks and fades. */
+.opc-hero[data-collapse] .opc-hero__content > ul,
+.opc-hero[data-collapse] .opc-hero__focus {
+  opacity: clamp(0, calc(1 - var(--opc-hero-p) / 0.45), 1);
+}
+.opc-hero[data-collapse] .opc-hero__content h1 {
+  opacity: clamp(0, calc(1 - (var(--opc-hero-p) - 0.2) / 0.55), 1);
+  scale: calc(1 - min(var(--opc-hero-p), 0.8) * 0.3);
+  transform-origin: 50% 100%;
+}
+/* The ask box slides from the content padding into the centre of the bar. */
+.opc-hero[data-collapse] .opc-hero__question {
+  translate: 0 calc(var(--opc-hero-p) * (var(--opc-hero-pad-bottom) - var(--opc-hero-bar-gap, 12px)));
+}
+@media (prefers-reduced-motion: reduce) {
+  .opc-hero[data-collapse] .opc-hero__art {
+    translate: none;
+  }
+  .opc-hero[data-collapse] .opc-hero__content h1 {
+    scale: none;
   }
 }

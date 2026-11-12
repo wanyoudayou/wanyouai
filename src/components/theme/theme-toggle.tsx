@@ -14,7 +14,8 @@ const appearances = {
   dark: { label: "深色模式", Icon: MoonIcon, next: "system" },
 } as const;
 
-export function ThemeToggle() {
+/** compact：只显示图标的圆形按钮，供前台侧栏与登录入口并排；可访问名称不变。 */
+export function ThemeToggle({ compact = false }: { compact?: boolean }) {
   const ready = useSyncExternalStore(subscribe, mounted, server);
   const { theme, setTheme } = useTheme();
   const mode = ready && (theme === "light" || theme === "dark") ? theme : "system";
@@ -25,7 +26,11 @@ export function ThemeToggle() {
       type="button"
       variant="outline"
       size="sm"
-      className="h-9 w-32 self-start gap-2 rounded-full border-border text-xs font-normal text-muted-foreground shadow-none hover:text-foreground active:bg-accent active:shadow-inner motion-reduce:transition-none"
+      className={
+        compact
+          ? "size-9 shrink-0 rounded-full border-border p-0 text-muted-foreground shadow-none hover:text-foreground active:bg-accent active:shadow-inner motion-reduce:transition-none"
+          : "h-9 w-32 self-start gap-2 rounded-full border-border text-xs font-normal text-muted-foreground shadow-none hover:text-foreground active:bg-accent active:shadow-inner motion-reduce:transition-none"
+      }
       aria-label={`外观：${label}；${action}`}
       title={action}
       data-theme-mode={mode}
@@ -33,7 +38,7 @@ export function ThemeToggle() {
       onClick={() => setTheme(next)}
     >
       <Icon className="size-4" aria-hidden />
-      <span>{label}</span>
+      {compact ? null : <span>{label}</span>}
     </Button>
   );
 }

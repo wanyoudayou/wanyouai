@@ -36,7 +36,7 @@ export async function createSeries(
         ok: false,
         message:
           error.code === "23505"
-            ? "此网址标识已存在，请查看已有专辑或换一个标识。"
+            ? "此网址标识已存在，请查看已有手册或活动，或换一个标识。"
             : "创建失败，请稍后重试。",
       };
     refreshContent();
@@ -45,8 +45,8 @@ export async function createSeries(
       id: Number(data.id),
       message:
         input.type === "event"
-          ? "活动专辑已创建。请在「专辑」页对此专辑点「操作」：先展开「活动详情（时间 / 地点 / 票价）」保存详情，再发布公开 README 并上架；活动文档可在「文件导入与审核」批量导入。"
-          : "草稿专辑已创建。请在「专辑」页对此专辑点「操作」，发布公开 README 并上架；章节文档可在「文件导入与审核」批量导入。",
+          ? "活动草稿已创建。下一步：保存时间与票价，发布公开介绍后上架。"
+          : "手册草稿已创建。下一步：发布公开介绍与章节后上架。",
     };
   } catch {
     return { ok: false, message: "创建服务暂时不可用，请稍后重试。" };

@@ -54,7 +54,16 @@ test("No hit or only locked evidence releases generation reservation without fre
   const f = fixture(); const locked = await f.answer();
   assert.equal(f.state.embedCalls, 1); assert.equal(f.state.generateCalls, 0); assert(!locked.text.includes("PAID_SECRET")); assert(locked.text.includes("/blog/paid"));
   assert(f.calls.some(call => call.name === "finish_ai_call" && call.args.p_outcome === "released"));
-  f.state.hits = []; assert.equal((await f.answer()).sources.length, 0); assert.equal(f.state.generateCalls, 0);
+  f.state.hits = []; const none = await f.answer(); assert.equal(none.sources.length, 0); assert.equal(f.state.generateCalls, 0);
+  assert.equal(none.status, "retrieval"); assert.match(none.text, /\[名片页面\]\(\/card\)/, "identity questions with no material still point to the card page");
+});
+
+test("Recommended instructions answer identity questions without inventing the owner, and link the card page", async () => {
+  const { DEFAULT_AVATAR_INSTRUCTIONS } = await import("../src/lib/ai/policy");
+  assert.match(DEFAULT_AVATAR_INSTRUCTIONS, /你是谁/);
+  assert.match(DEFAULT_AVATAR_INSTRUCTIONS, /不编造站主姓名/);
+  assert.match(DEFAULT_AVATAR_INSTRUCTIONS, /\[名片页面\]\(\/card\)/);
+  assert.ok(DEFAULT_AVATAR_INSTRUCTIONS.length < 8000, "fits the editor limit");
 });
 test("Actual gate controls owner, subscription, buyer and anonymous context, including QA", async () => {
   const ent = { user_id: uid, type: "single" as const, target_id: 1, ends_at: null, revoked_at: null };

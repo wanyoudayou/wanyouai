@@ -265,7 +265,7 @@ export async function inspectDeployment(
     status: avatar.status === "error" ? "error"
       : avatar.status === "disabled" ? "disabled" : "unverified",
     hint: "启用分身后再测试；生成请求可能产生模型费用。匿名提问另需开启匿名开关并配置 Turnstile。",
-    href: "/admin/avatar",
+    href: "/admin/ai",
     steps: [
       "用普通登录账户提问公开内容，确认正常回答、引用能打开；问题涉及未购正文时，只能获得允许的摘要或试读链接，不能出现受限正文。",
       "若开启匿名提问，在无痕窗口完成 Turnstile 后提问；未完成或校验失败时不得生成回答。未开启匿名提问则应提示登录。",

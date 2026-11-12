@@ -10,7 +10,10 @@ export async function markAttended(form: FormData) {
   const eventId = String(form.get("event_id") ?? "");
   if (!/^[0-9a-f-]{36}$/i.test(token) || !/^\d+$/.test(eventId)) return;
   const client = await createSupabaseServerClient();
+  // 名单核销只处理本活动的报名，防止表单被改成其他活动的 token。
+  const { data: registration } = await client.from("registrations").select("series_id").eq("checkin_token", token).maybeSingle();
+  if (!registration || String(registration.series_id) !== eventId) return;
   const { error } = await client.rpc("checkin_registration", { p_token: token });
-  if (error) console.error("[checkin] manual mark failed", error.message);
+  if (error) console.error("[checkin] manual mark failed");
   revalidatePath(`/admin/events/${eventId}`, "page");
 }

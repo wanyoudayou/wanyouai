@@ -18,21 +18,12 @@ import {
   AdminPanelPortal,
   useAdminPanel,
 } from "@/components/admin/admin-panel";
-import { pendingParty, hasPendingRequest } from "@/lib/services/tracking";
+import { pendingParty, hasPendingRequest, BOOKING_STATUS_LABEL } from "@/lib/services/tracking";
 import type { getBookingsData } from "@/lib/admin/bookings";
 
 type Booking = Awaited<ReturnType<typeof getBookingsData>>["active"][number];
 type Result = { ok: boolean; message: string };
-const STATUS_LABEL: Record<string, string> = {
-  inquiry: "询价",
-  quoted: "已报价",
-  booked: "已成交",
-  in_progress: "交付中",
-  delivered: "已交付",
-  accepted: "已验收",
-  settled: "已结案",
-  declined: "已婉拒",
-};
+const STATUS_LABEL = BOOKING_STATUS_LABEL;
 const STEPS: [string, string][] = [
   ["inquiry", "询价"],
   ["quoted", "报价"],
@@ -132,6 +123,8 @@ function MilestoneRow({
         const result = await action(initial, new FormData(event.currentTarget));
         setState(result);
         if (result.ok) setOpenForm(null);
+      } catch {
+        setState({ ok: false, message: "操作未完成，请刷新后确认检查点状态再重试。" });
       } finally {
         setPending(false);
       }
@@ -495,7 +488,7 @@ function BookingDetail({ booking }: { booking: Booking }) {
                     : "发送报价并通知客户"}
               </Button>
             </form>
-            <form action={advanceAction}>
+            <form action={advanceAction} onSubmit={(event) => { if (!window.confirm("婉拒后订单即结束，无法恢复。确定婉拒？")) event.preventDefault(); }}>
               {hidden}
               <input type="hidden" name="next" value="declined" />
               <Button size="sm" variant="ghost" disabled={advancing}>
@@ -593,11 +586,9 @@ function BookingDetail({ booking }: { booking: Booking }) {
                   订单条款
                   {booking.agreed_at ? `（签约于 ${booking.agreed_at}）` : ""}
                   {confirmed ? (
-                    <span className="ml-2 text-success">✓ 客户已确认</span>
+                    <StatusBadge tone="success" className="ml-2">客户已确认</StatusBadge>
                   ) : sent ? (
-                    <span className="ml-2 text-warning">
-                      已发送，待客户确认
-                    </span>
+                    <StatusBadge tone="warning" className="ml-2">已发送，待客户确认</StatusBadge>
                   ) : null}
                 </h3>
                 <dl className="space-y-1">
@@ -798,7 +789,7 @@ function BookingDetail({ booking }: { booking: Booking }) {
         </p>
       )}
       {!closed && booking.status === "accepted" && (
-        <form action={advanceAction}>
+        <form action={advanceAction} onSubmit={(event) => { if (!window.confirm("结案后订单归档、仅可查看，请确认线下款项已结清。确定结案？")) event.preventDefault(); }}>
           {hidden}
           <input type="hidden" name="next" value="settled" />
           <Button size="sm" disabled={advancing}>

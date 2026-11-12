@@ -1,5 +1,6 @@
 "use client";
 
+import type { ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -7,20 +8,46 @@ import {
   HomeIcon,
   MenuIcon,
   UserRoundIcon,
-  FileTextIcon,
   DownloadIcon,
 } from "lucide-react";
-import { NAV_ITEMS } from "@/components/shell/left-nav";
+import { NAV_ITEMS, navActiveHref } from "@/components/shell/left-nav";
+import { navIcon } from "@/lib/navigation/icons";
+import type { NavEntry } from "@/lib/navigation/types";
 import { cn } from "@/lib/utils";
+
+const RAIL_ITEM =
+  "flex size-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground";
+
+function RailLink({ href, label, Icon, external, active }: {
+  href: string;
+  label: string;
+  Icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+  external: boolean;
+  active: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+      aria-label={external ? `${label}（外部链接）` : label}
+      title={label}
+      aria-current={active ? "page" : undefined}
+      className={cn(RAIL_ITEM, active && "bg-accent text-primary")}
+    >
+      <Icon className="size-5" aria-hidden />
+    </Link>
+  );
+}
 
 export function NavigationRail({
   onDirectory,
-  navPages,
+  navItems,
 }: {
   onDirectory: () => void;
-  navPages: { href: string; label: string }[];
+  navItems: NavEntry[];
 }) {
   const pathname = usePathname();
+  const current = navActiveHref(pathname, navItems);
   return (
     <nav
       aria-label="快捷导航"
@@ -35,28 +62,29 @@ export function NavigationRail({
       >
         <MenuIcon className="size-5" />
       </button>
-      {[
-        ...NAV_ITEMS,
-        ...navPages.map((item) => ({ ...item, Icon: FileTextIcon })),
-      ].map(({ href, label, Icon }) => {
-        const active =
-          href === "/"
-            ? pathname === "/"
-            : pathname === href || pathname.startsWith(`${href}/`);
+      {NAV_ITEMS.map(({ href, label, Icon }) => (
+        <RailLink key={href} href={href} label={label} Icon={Icon} external={false} active={current === href} />
+      ))}
+      {navItems.map((item) => {
+        const Icon = navIcon(item.icon);
+        if (item.kind !== "group")
+          return (
+            <RailLink key={item.href} href={item.href} label={item.label} Icon={Icon} external={item.external}
+              active={!item.external && current === item.href} />
+          );
+        // 父级目录在图标栏中打开完整目录，在目录里展开子项。
+        const active = item.children.some((child) => !child.external && child.href === current);
         return (
-          <Link
-            key={href}
-            href={href}
-            aria-label={label}
-            title={label}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "flex size-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground",
-              active && "bg-accent text-primary",
-            )}
+          <button
+            key={item.key}
+            type="button"
+            onClick={onDirectory}
+            aria-label={`${item.label}（在目录中展开）`}
+            title={item.label}
+            className={cn(RAIL_ITEM, active && "bg-accent text-primary")}
           >
             <Icon className="size-5" aria-hidden />
-          </Link>
+          </button>
         );
       })}
     </nav>
@@ -105,6 +133,7 @@ export function MobileNavigation({
       <Link
         href={loggedIn ? "/me" : "/login"}
         className={cn(item, pathname.startsWith("/me") && "text-primary")}
+        aria-current={pathname === "/me" || pathname.startsWith("/me/") ? "page" : undefined}
       >
         <UserRoundIcon className="size-5" aria-hidden />
         我的

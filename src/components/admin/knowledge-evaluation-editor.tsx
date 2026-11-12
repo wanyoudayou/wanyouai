@@ -97,7 +97,7 @@ export function KnowledgeEvaluationEditor({ disabled, eligible, onStart, detail,
   const pages = Math.max(1, Math.ceil(cases.length / 10)); const currentPage = Math.min(page, pages);
   function exportQuestions() {
     const url = URL.createObjectURL(new Blob([JSON.stringify(cases, null, 2)], { type: "application/json" }));
-    const link = document.createElement("a"); link.href = url; link.download = "knowledge-evaluation.json"; link.click(); URL.revokeObjectURL(url);
+    const link = document.createElement("a"); link.href = url; link.download = "knowledge-evaluation.json"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   function cancelEdit() {
     if (!unchanged && !cancelAsked) { setCancelAsked(true); return; }

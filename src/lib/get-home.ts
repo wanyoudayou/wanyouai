@@ -232,13 +232,14 @@ export async function getHomeData(
 
     const publishedSeries = (seriesResult.data ?? []) as SeriesRow[];
     // 封面与手册/技能栏目同源：取 README 文章的 cover_url（否则首页橱窗恒为占位图）
-    const showcaseIds = publishedSeries.map((row) => row.id);
+    // 只读各专辑 README 本身，避免把全部章节读出后被 PostgREST 行数上限截断。
+    const readmeIds = publishedSeries.flatMap((row) => row.readme_article_id === null ? [] : [row.readme_article_id]);
     const coverByArticleId = new Map<number, string | null>();
-    if (showcaseIds.length > 0) {
+    if (readmeIds.length > 0) {
       const { data: coverRows, error: coverError } = await supabase
         .from("articles")
         .select("id, cover_url")
-        .in("series_id", showcaseIds)
+        .in("id", readmeIds)
         .eq("type", "chapter")
         .eq("status", "published");
       if (coverError) console.error("[getHomeData:covers]", coverError.message);
@@ -290,8 +291,8 @@ export async function getHomeData(
           .select(
             "series_id, state, starts_at, location_text, kind, ticket_price",
           )
+          .in("series_id", eventRows.map((row) => row.id))
           .in("state", ["upcoming", "registering"])
-          .limit(50)
           .order("starts_at", { ascending: true })
       : { data: [] as Record<string, never>[] };
     const detailBySeriesId = new Map(

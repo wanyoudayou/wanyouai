@@ -27,6 +27,7 @@ export const EXPORT_TABLES = [
   "inbox_items",
   "milestones",
   "media_assets",
+  "nav_items",
   "orders",
   "payment_events",
   "profiles",
@@ -61,6 +62,8 @@ export const EXPORT_OMITTED_TABLES = [
   "handbook_credentials",
   "handbook_sync_operations",
   "handbook_media_uploads",
+  // 公开提交的每日限频计数：运行状态，不属于可复用内容或业务数据。
+  "request_limits",
 ] as const;
 
 export function exportCursorColumns(table: ExportTable): readonly string[] {

@@ -41,3 +41,14 @@ test('users: 订阅者 CSV 只含有效订阅者且正确转义',()=>{
   assert.ok(!csv.includes('b@example.test'));
   assert.ok(csv.includes('"we""ird@example.test"'));
 });
+
+test('users derive: future subscriptions are inactive; any permanent subscription wins', async () => {
+  const { deriveUserRow } = await import('../src/lib/admin/users-derive');
+  const user = { id: 'u1', email: 'u1@example.test', created_at: '2026-01-01T00:00:00Z' };
+  const now = new Date('2026-06-01T00:00:00Z');
+  const future = deriveUserRow(user, [ent({ starts_at: '2026-07-01T00:00:00Z', ends_at: '2027-07-01T00:00:00Z' })], [], now);
+  assert.equal(future.subscriptionActive, false);
+  const mixed = deriveUserRow(user, [ent({ ends_at: '2026-12-01T00:00:00Z' }), ent({ ends_at: null })], [], now);
+  assert.equal(mixed.subscriptionActive, true);
+  assert.equal(mixed.subscriptionEndsAt, null);
+});

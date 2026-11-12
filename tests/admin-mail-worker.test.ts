@@ -98,3 +98,9 @@ test("mail worker: 23h safe window, stale lease, missing recipient and partial a
   assert.equal((await runMailOutbox(exhausted.api, config, { now: () => clock, deliver: async () => ({ outcome: "retry", code: "network" }) })).summary.dead, 1);
   assert.deepEqual(exhausted.records, [{ outcome: "dead", code: "attempts_exhausted" }]);
 });
+
+test("grant mail prints validity in the site timezone", () => {
+  const job = { snapshot: { version: 1, user_id: "u", order_id: 7, site_name: "站", description: "全站订阅", ends_at: "2027-03-01T20:00:00Z" } } as MailJob;
+  assert.match(renderGrantMessage(job, "a@example.test", { ...config, timeZone: "Asia/Shanghai" }).text, /有效期至 2027-03-02/);
+  assert.match(renderGrantMessage(job, "a@example.test", config).text, /有效期至 2027-03-01/);
+});

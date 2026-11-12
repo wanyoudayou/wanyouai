@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getUserIdentity } from "@/lib/account/session";
+import { loginHref } from "@/lib/account/auth-flow";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { StatusBadge } from "@/components/shared/status-badge";
 import {
@@ -52,15 +53,17 @@ export default async function ServiceTrackingPage({
   const bookingId = Number((await params).id);
   if (!Number.isInteger(bookingId) || bookingId <= 0) notFound();
   const { user } = await getUserIdentity();
-  if (!user) redirect("/login");
+  if (!user) redirect(loginHref(`/me/services/${bookingId}`));
   const client = await createSupabaseServerClient();
-  // RLS bookings_own_read：非当事人查询为 0 行 → 404（与内容页同一不泄露口径）
+  // RLS bookings_own_read：非当事人查询为 0 行 → 404（与内容页同一不泄露口径）。
+  // 站主的 RLS 可读全部订单，这里再按本人过滤，避免在 /me 下看到别人的客户视角。
   const { data: booking } = await client
     .from("bookings")
     .select(
       "id,service_id,email,intent,budget_range,deadline,status,agreement_snapshot,agreement_sent_at,agreement_confirmed_at,quote_snapshot,delivery_snapshot,revision_notes,agreed_at,created_at",
     )
     .eq("id", bookingId)
+    .eq("user_id", user.id)
     .maybeSingle();
   if (!booking) notFound();
   const [{ data: svc }, { data: milestones }] = await Promise.all([
@@ -356,7 +359,7 @@ export default async function ServiceTrackingPage({
                             {ms.client_request}
                           </p>
                           {ms.client_response && !hasPendingRequest(ms) ? (
-                            <p className="mt-2 border-t border-amber-200 pt-2 text-xs text-muted-foreground">
+                            <p className="mt-2 border-t border-warning/30 pt-2 text-xs text-muted-foreground">
                               你的反馈：{ms.client_response}
                             </p>
                           ) : !closed && ms.id ? (

@@ -1,3 +1,4 @@
+import { GeneratedCover } from "@/components/cards/generated-cover";
 import { BriefcaseBusinessIcon } from "lucide-react";
 
 import {
@@ -20,9 +21,7 @@ export function ServiceCard({
   return (
     <ContentCard href={`/services/${data.slug}`} kind="service">
       <div className="opc-content-card-cover">
-        <div className="opc-content-card-placeholder" aria-hidden>
-          <BriefcaseBusinessIcon className="size-5" />
-        </div>
+        <GeneratedCover title={data.title} Icon={BriefcaseBusinessIcon} />
         <ContentCardChip>服务合作</ContentCardChip>
       </div>
       <div className="opc-content-card-body">

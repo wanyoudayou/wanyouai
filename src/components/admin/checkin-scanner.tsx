@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 
 // BarcodeDetector 不在 TS DOM 标准库内，最小声明
@@ -10,6 +10,11 @@ declare class BarcodeDetector {
 }
 
 type ScanResult = { ok: boolean; message: string };
+
+const noSubscription = () => () => {};
+// 服务端与首帧水合统一按“支持”渲染，随后客户端按真实能力切换，避免 iOS Safari / Firefox 水合不一致。
+const detectSupport = () => "BarcodeDetector" in window;
+const assumeSupport = () => true;
 
 function extractToken(text: string): string | null {
   const match =
@@ -22,9 +27,9 @@ function extractToken(text: string): string | null {
 export function CheckinScanner() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [scanning, setScanning] = useState(false);
-  const [supported] = useState(
-    () => typeof window === "undefined" || "BarcodeDetector" in window,
-  );
+  const supported = useSyncExternalStore(noSubscription, detectSupport, assumeSupport);
+  const mounted = useRef(true);
+  const starting = useRef(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [manual, setManual] = useState("");
   const [busy, setBusy] = useState(false);
@@ -63,11 +68,18 @@ export function CheckinScanner() {
   };
 
   const startScan = async () => {
+    // 连点或启动途中卸载都不能留下未关闭的摄像头流。
+    if (starting.current || streamRef.current) return;
+    starting.current = true;
     setResult(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
       });
+      if (!mounted.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -97,6 +109,8 @@ export function CheckinScanner() {
         ok: false,
         message: "无法打开摄像头，请检查授权，或改用下方手动输入",
       });
+    } finally {
+      starting.current = false;
     }
   };
 
@@ -106,8 +120,14 @@ export function CheckinScanner() {
     setScanning(false);
   };
 
-  // 支持性在首渲染即判定（客户端组件，无 SSR 窗口期问题）；effect 只负责卸载时关摄像头
-  useEffect(() => () => stopScan(), []);
+  // 卸载时关摄像头，并让进行中的启动知道组件已卸载。
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      stopScan();
+    };
+  }, []);
 
   return (
     <div className="space-y-4">

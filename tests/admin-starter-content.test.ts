@@ -67,7 +67,7 @@ test("starter resumes after lost responses, preserves one version and activates 
     assert.equal(
       (
         await db.query<{ n: number }>(
-          "select count(*)::int n from public.series where slug='getting-started' and nav_enabled",
+          "select count(*)::int n from public.nav_items n join public.series s on s.id=n.series_id where s.slug='getting-started' and n.enabled",
         )
       ).rows[0].n,
       0,
@@ -99,12 +99,23 @@ test("starter resumes after lost responses, preserves one version and activates 
     assert.equal(
       (
         await db.query<{ n: number }>(
-          "select count(*)::int n from public.custom_pages where slug='pricing' and status='published' and placement='nav'",
+          "select count(*)::int n from public.custom_pages p join public.nav_items n on n.page_id=p.id where p.slug='pricing' and p.status='published' and n.enabled",
         )
       ).rows[0].n,
       1,
     );
     await db.exec("reset role;set role anon");
+    assert.deepEqual(
+      (
+        await db.query<{ kind: string; label: string }>(
+          "select kind,label from public.public_navigation()",
+        )
+      ).rows,
+      [
+        { kind: "page", label: "收费方案" },
+        { kind: "series", label: "使用指南" },
+      ],
+    );
     assert.equal(
       (
         await db
@@ -187,7 +198,7 @@ test("starter stops final activation when a previously published chapter was edi
     assert.equal(
       (
         await db.query<{ n: number }>(
-          "select count(*)::int n from public.series where slug='getting-started' and nav_enabled",
+          "select count(*)::int n from public.nav_items n join public.series s on s.id=n.series_id where s.slug='getting-started' and n.enabled",
         )
       ).rows[0].n,
       0,

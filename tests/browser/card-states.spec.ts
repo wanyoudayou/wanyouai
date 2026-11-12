@@ -74,7 +74,7 @@ for (const theme of ["light", "dark"] as const) {
       });
       expect(pressed.shadow).toContain("inset");
       expect(pressed.background).toBe(
-        theme === "light" ? "rgb(255, 255, 255)" : "rgb(13, 19, 13)",
+        theme === "light" ? "rgb(255, 255, 255)" : "rgb(17, 14, 32)",
       );
       expect(await surface.boundingBox()).toEqual(original);
       await link.screenshot({

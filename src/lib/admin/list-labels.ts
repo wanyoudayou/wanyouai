@@ -1,3 +1,5 @@
+import { BOOKING_STATUS_LABEL } from "@/lib/services/tracking";
+
 export const ADMIN_LABELS: Record<string, string> = {
   open: "待处理",
   done: "已处理",
@@ -24,14 +26,7 @@ export const ADMIN_LABELS: Record<string, string> = {
   refunded: "已退款",
   active: "进行中",
   closed: "已结束",
-  inquiry: "询价",
-  quoted: "已报价",
-  booked: "已成交",
-  in_progress: "进行中",
-  delivered: "已交付",
-  accepted: "已验收",
-  settled: "已结案",
-  declined: "已婉拒",
+  ...BOOKING_STATUS_LABEL,
   new: "未处理",
   read: "已读",
   public: "已公开",

@@ -159,7 +159,8 @@ export async function resolveMedia(input: PublishInput, store: MediaStore) {
     if (converted) await store.upload(finalPath, converted, "image/png");
     const finalUrl = store.publicUrl(finalPath);
     urls.set(media.source_path, finalUrl);
-    urls.set(store.publicUrl(media.storage_path), finalUrl);
+    // SVG 原件不会出现在公开桶，也无公开地址；只有原样保留的位图需要旧地址映射。
+    if (!converted) urls.set(store.publicUrl(media.storage_path), finalUrl);
     verifiedPaths.set(media.storage_path, finalUrl);
   }
   function resolve(url: string, path: string) {

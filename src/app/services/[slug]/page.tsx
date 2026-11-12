@@ -5,7 +5,6 @@ import { notFound } from "next/navigation";
 import { getServiceBySlug } from "@/lib/get-services";
 import { getSiteConfig } from "@/lib/get-site-config";
 import { getUserIdentity } from "@/lib/account/session";
-import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { ServiceDetail } from "@/components/service/service-detail";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { loadTurnstilePublic } from "@/lib/turnstile-config";
@@ -37,24 +36,9 @@ export default async function ServicePage({ params }: Props) {
   ]);
   if (!service) notFound();
   const currency = site.commerce.subscriptionPrice?.currency ?? "CNY";
-  // 交易锚定评价：该服务已结案订单的评价（公开，evaluations_public_read；不含个人信息）
-  // bookings 表对 anon 无授权：评价取数走 service（仅用订单 id 关联，不输出任何订单字段）
-  const client = createSupabaseServiceClient();
-  const { data: settledBookings } = await client
-    .from("bookings")
-    .select("id")
-    .eq("service_id", service.id)
-    .eq("status", "settled")
-    .limit(100);
-  const bookingIds = (settledBookings ?? []).map((b) => b.id);
-  const { data: evaluations } = bookingIds.length
-    ? await client
-        .from("evaluations")
-        .select("id,rating,content,created_at")
-        .in("booking_id", bookingIds)
-        .order("created_at", { ascending: false })
-        .limit(20)
-    : { data: [] };
+  // 交易锚定评价：公开函数只返回已结案订单的评分、内容与时间，不输出订单或个人字段。
+  const { data: evaluations } = await (await createSupabaseServerClient())
+    .rpc("public_service_evaluations", { p_service: service.id, p_limit: 20 });
 
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-12 lg:px-8">

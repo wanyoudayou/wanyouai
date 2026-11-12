@@ -12,3 +12,10 @@ export async function readBoundedBody(request: Request, limit: number) {
   }
   return Buffer.concat(chunks);
 }
+
+/** Parse a JSON object body without buffering more than `limit` bytes. */
+export async function readBoundedJson(request: Request, limit = 16 * 1024): Promise<Record<string, unknown>> {
+  const value: unknown = JSON.parse((await readBoundedBody(request, limit)).toString("utf8"));
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("JSON object required");
+  return value as Record<string, unknown>;
+}

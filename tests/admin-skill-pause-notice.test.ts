@@ -17,7 +17,11 @@ test("old and new Skill pause entrypoints share notice identity and deduplicate 
         : [{ user_id: "same-buyer", starts_at: "2000-01-01", ends_at: null }];
       const q = { select: () => q, eq: (key: string, value: unknown) => { filters[key] = value; return q; }, is: () => q, limit: () => q,
         maybeSingle: async () => ({ data: data(), error: null }), then: (yes: (value: unknown) => unknown) => Promise.resolve({ data: data(), error: null }).then(yes),
-        insert: async (row: Record<string, unknown>) => { notices.push(row); return { error: null }; } };
+        delete: () => q,
+        insert: async (row: Record<string, unknown>) => {
+          if (notices.some(n => n.kind === row.kind && n.ref_id === row.ref_id)) return { error: { code: "23505" } };
+          notices.push(row); return { error: null };
+        } };
       return q;
     },
   };
@@ -31,5 +35,5 @@ test("old and new Skill pause entrypoints share notice identity and deduplicate 
   assert.equal((await exports.sendPauseNotice("article", 10)).notified, 1);
   assert.equal((await exports.sendPauseNotice("series", 20)).alreadySent, true);
   assert.equal(sent.length, 1); assert.equal(notices.length, 1);
-  assert.match(String(notices[0].ref_id), /^series:20:/);
+  assert.match(String(notices[0].ref_id), /^series:20:\d{8}:same-buyer$/);
 });

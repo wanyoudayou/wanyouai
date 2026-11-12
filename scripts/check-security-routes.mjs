@@ -55,6 +55,14 @@ assert.equal(paymentHead.headers.get("allow"), "POST");
 assert.equal(paymentHead.headers.get("cache-control"), "no-store");
 assert.equal(await paymentHead.text(), "");
 passed++;
+for (const path of ["/", "/admin"]) {
+  const response = await request(path);
+  const csp = response.headers.get("content-security-policy") ?? "";
+  assert(/frame-ancestors 'none'/.test(csp), `${path} must forbid framing`);
+  assert.equal(response.headers.get("x-frame-options"), "DENY");
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  passed++;
+}
 const setup = await request("/admin/setup");
 const setupHtml = await setup.text();
 assert([200, 303, 307, 308].includes(setup.status));

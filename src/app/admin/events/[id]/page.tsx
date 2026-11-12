@@ -21,10 +21,10 @@ export default async function Page({
   if (error) throw new Error("活动暂时不可用");
   if (!data || data.type !== "event") notFound();
   return (
-    <div>
-      <header className="space-y-3 px-6 pt-8">
+    <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+      <header className="space-y-3">
         <Link href={`/admin/collections/${id}`} className="text-primary">
-          返回活动专辑
+          返回活动设置
         </Link>
         <h1 className="text-2xl font-semibold">{data.title}</h1>
         <a
@@ -38,6 +38,7 @@ export default async function Page({
       <AdminResourcePage
         resource="registrations"
         params={{ ...(await searchParams), series: data.slug }}
+        embedded
       />
     </div>
   );

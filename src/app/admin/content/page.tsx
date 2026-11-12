@@ -9,7 +9,7 @@ import { reviewRevision } from "@/lib/importing/server";
 import { createPublisherStore } from "@/lib/publishing/server";
 import { ContentWorkbench } from "@/components/admin/content-workbench";
 export const metadata: Metadata = {
-  title: "内容工作台",
+  title: "文章编辑",
   robots: { index: false, follow: false },
 };
 export default async function ContentPage({
@@ -99,18 +99,18 @@ export default async function ContentPage({
       }
     : articleDraft;
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-6 py-10 lg:px-8">
-      <Link
-        href={adminReturn(params.returnTo, "/admin/articles")}
-        className="text-sm text-muted-foreground underline"
-      >
-        返回后台
-      </Link>
-      <h1 className="text-2xl font-medium">内容工作台</h1>
-      <p className="text-sm leading-6 text-muted-foreground">
-        新建草稿或导入 Markdown
-        文件，保存待发布修订，检查匿名预览后确认发布。相同文章地址更新原文章。
-      </p>
+    <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+      <header className="space-y-2">
+        <Link
+          href={adminReturn(params.returnTo, "/admin/articles")}
+          className="text-sm text-primary"
+        >
+          返回列表
+        </Link>
+        <h1 className="text-2xl font-semibold">
+          {revision ? "审核修订" : articleDraft ? "编辑文章" : "新建文章"}
+        </h1>
+      </header>
       <ContentWorkbench
         initialDraft={initialDraft}
         initialType={initialType}

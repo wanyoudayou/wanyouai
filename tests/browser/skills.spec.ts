@@ -53,7 +53,7 @@ test("new Skill introduction fixes content type and public access with an explan
   await expect(page.getByLabel("内容类型", { exact: true })).toBeDisabled();
   await expect(page.getByLabel("阅读权限", { exact: true })).toBeDisabled();
   await expect(page.getByLabel("阅读权限", { exact: true })).toHaveValue("public");
-  await expect(page.getByText("已固定为 Skill 公开介绍。")).toBeVisible();
+  await expect(page.getByText("已固定为技能公开介绍。")).toBeVisible();
   await page.getByLabel("标题", { exact: true }).fill("可编辑的介绍标题");
   await expect(page.getByLabel("标题", { exact: true })).toHaveValue("可编辑的介绍标题");
 });
@@ -189,6 +189,10 @@ test("handbook credential appears once, can be hidden and revoked", async ({ pag
   await expect(page.getByLabel("手册上传凭据", { exact: true })).toHaveValue("synthetic-handbook-credential");
   await page.getByRole("button", { name: "已保存，隐藏凭据" }).click();
   await expect(page.getByLabel("手册上传凭据", { exact: true })).toHaveCount(0);
+  // 撤销会中断插件同步，需先确认。
+  let confirmText = "";
+  page.once("dialog", dialog => { confirmText = dialog.message(); void dialog.accept(); });
   await page.getByRole("button", { name: "撤销连接", exact: true }).click();
   await expect(page.getByRole("button", { name: "撤销连接", exact: true })).toHaveCount(0);
+  expect(confirmText).toContain("笔记库");
 });

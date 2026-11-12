@@ -27,11 +27,11 @@ POST /api/orders            cookie 会话（匿名 401）
   res:  201 { order: { id, sku_type, target_id, amount, status, created_at } }
         400 参数非法 · 401 匿名 · 403 SKU 不可售 · 409 已持权益（复用/冲突说明）
 
-GET /api/payments/start?order=<id>&channel=<alipay|wxpay>   仅订单本人且 status='pending' → 302 平台收银台
+GET /api/payments/start?order=<id>&channel=<alipay|wxpay>   仅订单本人且 status='pending'，按建单同一规则复核商品仍可售且价格未变（否则 409）→ 302 平台收银台
   （payment_enabled 关闭时 503，不产生收银台跳转；channel 必须在 site_config.commerce.payment_channels 内，否则 400/403；渠道由站主在后台勾选，须在 zpay 商户中心已开通）
 GET /checkout/[orderId]              订单核对页（本人；非本人 404 不泄露存在性）
 GET|POST /api/payments/notify        zpay 服务端回调（无会话，验签与商户 / 状态 / 金额校验）
-POST /api/payments/reconcile         PUBLISH_TOKEN 或 owner 会话；查单补漏
+POST /api/payments/reconcile         PUBLISH_TOKEN 或同源 owner 会话；查单补漏
 ```
 
 ## 3. PaymentProvider 接口（三方法）

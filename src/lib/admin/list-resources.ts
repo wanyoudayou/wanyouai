@@ -26,7 +26,7 @@ export const RESOURCES = {
     description: "管理手册和活动的介绍与章节。旧技能章节保留兼容入口；新 Skill 在独立入口管理。",
     table: "admin_collections",
     select:
-      "id,slug,title,type,status,chapter_count,nav_enabled,nav_label,nav_order,updated_at",
+      "id,slug,title,type,status,chapter_count,updated_at",
     search: "title",
     statuses: contentStates,
     types: ["collection", "handbook", "skill", "event"],
@@ -73,7 +73,8 @@ export const RESOURCES = {
     description: "处理转人工与询价留言；私有对话和公开稿分别管理。",
     table: "inbox_items",
     select: "id,kind,contact,status,created_at",
-    search: "kind",
+    // 按联系邮箱查找留言；kind 只有两种取值，搜索它没有意义。
+    search: "contact",
     statuses: ["open", "done"],
     types: [],
   },
@@ -123,13 +124,17 @@ export type ListRecord = Record<string, unknown>;
 export async function getAdminResourcePage(
   resource: ResourceKind,
   raw: RawListQuery,
+  typeScope?: readonly string[],
 ) {
   if (!(await getAdminIdentity()).owner) throw new Error("需要站主身份");
   const spec = RESOURCES[resource];
   const query = parseListQuery(raw);
   if (!(spec.statuses as readonly string[]).includes(query.status))
     query.status = "";
-  if (!(spec.types as readonly string[]).includes(query.type)) query.type = "";
+  const allowedTypes = (spec.types as readonly string[]).filter(
+    (type) => !typeScope || typeScope.includes(type),
+  );
+  if (!allowedTypes.includes(query.type)) query.type = "";
   if (resource === "articles" && query.series && !raw.sort)
     query.sort = "reading";
   if (query.sort === "reading" && resource !== "articles")
@@ -178,6 +183,7 @@ export async function getAdminResourcePage(
     if (query.q)
       request = request.ilike(spec.search, `%${escapeLike(query.q)}%`);
     if (query.type) request = request.eq("type", query.type);
+    else if (typeScope) request = request.in("type", [...typeScope]);
     if (resource === "articles") {
       if (query.status === "unpublished")
         request = request.is("article_id", null);

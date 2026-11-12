@@ -65,6 +65,7 @@ export function EvaluationForm({ bookingId }: { bookingId: number }) {
         ))}
       </div>
       <textarea
+        aria-label="评价内容（可选）"
         value={content}
         onChange={(event) => setContent(event.target.value)}
         rows={3}

@@ -16,6 +16,8 @@ export function mailerFromEnv(fetchImpl: typeof fetch = fetch): Mailer | null {
     async send({ to, subject, html, text }) {
       const response = await fetchImpl("https://api.resend.com/emails", {
         method: "POST",
+        // 邮件服务无响应时不拖住站主动作或问答；调用方已把发信失败当作非致命。
+        signal: AbortSignal.timeout(8000),
         headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
         body: JSON.stringify({ from, to: [to], subject, html, text }),
       });

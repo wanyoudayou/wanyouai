@@ -32,6 +32,7 @@
 - [AI 配置与知识库工程规则](development/ai-settings-plan.md)：共享连接、任务提示词隔离、知识库启用与诊断边界。
 - [AI SDK 接入与维护](development/ai-sdk-migration.md)：直接供应商映射、安全出站、依赖升级验证与应用回退。
 - [Embedding 实施规格](development/embedding-implementation.md)：1024 维模型与接口、显式联网检查、可恢复索引、代际切换及验收。
+- [自定义导航与代码栏目](development/custom-sections.md)：导航表、栏目目录与档位、守卫、访问判定、脚手架与本地 skill。
 - [前端技术栈](development/frontend-stack.md)、[分身配额](development/avatar-quota.md)、[导出一致性](development/export-consistency.md)、[规模基线](development/scale-performance.md)。
 - [安全审查摘要](development/security-review.md)、[发布状态](development/release-status.md)、[安全反馈](../SECURITY.md)。
 - [版本验证与发布](development/releasing.md)：显式冒烟清单、可重复源码与插件打包、校验和发布顺序。

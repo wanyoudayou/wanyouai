@@ -42,7 +42,7 @@ export function AgreementRespond({ bookingId }: { bookingId: number }) {
       {objectOpen && (
         <form action={action} className="space-y-2">
           <input type="hidden" name="id" value={bookingId} /><input type="hidden" name="action" value="object_agreement" />
-          <textarea name="note" required minLength={5} maxLength={1000} rows={3} placeholder="请说明对条款的异议……" className="block w-full rounded-md border bg-background p-2 text-sm" />
+          <textarea name="note" required minLength={5} maxLength={1000} rows={3} aria-label="对条款的异议" placeholder="请说明对条款的异议……" className="block w-full rounded-md border bg-background p-2 text-sm" />
           <Button size="sm" variant="outline" disabled={pending}>{pending ? "提交中…" : "提交异议（退回站主修改）"}</Button>
         </form>
       )}
@@ -61,7 +61,7 @@ export function MilestoneRespond({ bookingId, milestoneId }: { bookingId: number
       <input type="hidden" name="id" value={bookingId} />
       <input type="hidden" name="action" value="respond_milestone" />
       <input type="hidden" name="milestone_id" value={milestoneId} />
-      <textarea name="note" required maxLength={1000} rows={2} placeholder="回复站主的请求；素材可贴链接……" className="block w-full rounded-md border bg-background p-2 text-sm" />
+      <textarea name="note" required maxLength={1000} rows={2} aria-label="回复站主的请求" placeholder="回复站主的请求；素材可贴链接……" className="block w-full rounded-md border bg-background p-2 text-sm" />
       <div className="flex items-center gap-2">
         <Button size="sm" disabled={pending}>{pending ? "提交中…" : "提交反馈"}</Button>
         {state.message && <p role="alert" className="text-xs text-muted-foreground">{state.message}</p>}
@@ -86,7 +86,7 @@ export function MilestoneAccept({ bookingId, milestoneId }: { bookingId: number;
       {objectOpen && (
         <form action={action} className="space-y-2">
           <input type="hidden" name="id" value={bookingId} /><input type="hidden" name="action" value="object_milestone" /><input type="hidden" name="milestone_id" value={milestoneId} />
-          <textarea name="note" required minLength={5} maxLength={1000} rows={2} placeholder="请说明驳回原因（必填，站主会收到并返工）……" className="block w-full rounded-md border bg-background p-2 text-sm" />
+          <textarea name="note" required minLength={5} maxLength={1000} rows={2} aria-label="驳回原因" placeholder="请说明驳回原因（必填，站主会收到并返工）……" className="block w-full rounded-md border bg-background p-2 text-sm" />
           <Button size="sm" variant="outline" disabled={pending}>{pending ? "提交中…" : "提交驳回"}</Button>
         </form>
       )}
@@ -111,7 +111,7 @@ export function DeliveryRespond({ bookingId }: { bookingId: number }) {
       {reviseOpen && (
         <form action={action} className="space-y-2">
           <input type="hidden" name="id" value={bookingId} /><input type="hidden" name="action" value="request_revision" />
-          <textarea name="note" required minLength={5} maxLength={1000} rows={3} placeholder="请说明需要修改的地方……" className="block w-full rounded-md border bg-background p-2 text-sm" />
+          <textarea name="note" required minLength={5} maxLength={1000} rows={3} aria-label="需要修改的地方" placeholder="请说明需要修改的地方……" className="block w-full rounded-md border bg-background p-2 text-sm" />
           <Button size="sm" variant="outline" disabled={pending}>{pending ? "提交中…" : "提交修改意见"}</Button>
         </form>
       )}

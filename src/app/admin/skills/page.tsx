@@ -7,7 +7,7 @@ import type { RawListQuery } from "@/lib/admin/list-query";
 export default async function Page({ searchParams }: { searchParams: Promise<RawListQuery> }) {
   if (!(await getAdminIdentity()).owner) redirect("/admin");
   const data = await getAdminResourcePage("articles", { ...await searchParams, type: "skill", series: undefined });
-  return <section className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6"><header><h1 className="text-2xl font-semibold">SKILL</h1><p className="mt-2 text-sm text-muted-foreground">先编写公开介绍，再管理私有版本包、收费与在线使用。</p></header>
+  return <section className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6"><header><h1 className="text-2xl font-semibold">技能</h1><p className="mt-2 text-sm text-muted-foreground">先编写公开介绍，再管理私有版本包、收费与在线使用。</p></header>
     <AdminDataTable query={data.query} total={data.filteredTotal} statuses={["draft", "published", "paused", "archived", "unpublished", "pending-review"]} columns={[{ key: "status", label: "状态" }]} create={{ label: "新建 Skill 介绍", href: "/admin/content?type=skill&returnTo=/admin/skills" }}
       rows={data.items.map(a => {
         const editor = a.article_id ? `/admin/content?article=${a.article_id}&returnTo=/admin/skills` : `/admin/content?revision=${a.pending_revision_id}&returnTo=/admin/skills`;

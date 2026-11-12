@@ -1,4 +1,10 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getSiteConfig } from "@/lib/get-site-config";
+import { formatDateTime, formatPrice } from "@/lib/format";
+import { ADMIN_LABELS } from "@/lib/admin/list-labels";
+
+const SKU_LABELS: Record<string, string> = { subscription: "订阅", series: "手册", single: "单篇", event: "活动票", skill: "技能" };
+const SOURCE_LABELS: Record<string, string> = { order: "购买", admin: "站主开通", checkin: "到场核销" };
 import { AdminDataTable } from "./admin-data-table";
 import {
   parseListQuery,
@@ -17,7 +23,9 @@ export async function AccountRecords({
 }) {
   const query = parseListQuery(params);
   query.q = "";
-  const client = await createSupabaseServerClient();
+  const [client, site] = await Promise.all([createSupabaseServerClient(), getSiteConfig()]);
+  const tz = site.identity.timezone;
+  const currency = site.commerce.subscriptionPrice?.currency ?? "CNY";
   const select =
     kind === "orders"
       ? "id,sku_type,amount,status,created_at"
@@ -28,7 +36,7 @@ export async function AccountRecords({
       .select(select, { count: "exact" })
       .eq("user_id", userId)
       .order("created_at", { ascending: query.sort === "oldest" })
-      .order("id", { ascending: false })
+      .order("id", { ascending: query.sort === "oldest" })
       .range((page - 1) * query.pageSize, page * query.pageSize - 1);
   let result = await read(query.page);
   if (result.error || result.count === null)
@@ -45,7 +53,7 @@ export async function AccountRecords({
   ).map((row) => ({
     key: String(row.id),
     title:
-      kind === "orders" ? `订单 #${row.id}` : `权益 #${row.id} · ${row.type}`,
+      kind === "orders" ? `订单 #${row.id}` : `权益 #${row.id} · ${SKU_LABELS[String(row.type)] ?? row.type}`,
     href:
       kind === "orders"
         ? `/admin/payments/${row.id}`
@@ -53,9 +61,9 @@ export async function AccountRecords({
     cells: {
       details:
         kind === "orders"
-          ? `${row.sku_type} · ${row.amount} · ${row.status}`
-          : `${row.source} · ${row.revoked_at ? "已撤销" : row.ends_at ? `至 ${row.ends_at}` : "永久有效"}`,
-      created: String(row.created_at),
+          ? `${SKU_LABELS[String(row.sku_type)] ?? row.sku_type} · ${formatPrice(Number(row.amount), currency)} · ${ADMIN_LABELS[String(row.status)] ?? row.status}`
+          : `${SOURCE_LABELS[String(row.source)] ?? row.source} · ${row.revoked_at ? "已撤销" : row.ends_at ? `至 ${formatDateTime(String(row.ends_at), tz)}` : "永久有效"}`,
+      created: formatDateTime(String(row.created_at), tz),
     },
   }));
   return (

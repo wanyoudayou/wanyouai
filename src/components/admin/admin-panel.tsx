@@ -1,6 +1,7 @@
 "use client";
 import { createContext, useCallback, useContext, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { usePathname } from "next/navigation";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 const narrowQuery = "(max-width: 1279px)";
 function subscribeViewport(onChange: () => void) {
@@ -19,6 +20,13 @@ export function useAdminPanel() {
 }
 export function AdminPanelProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  // 换页时只关闭快捷操作面板；不重建整个外壳，分身对话与折叠状态得以保留。
+  const pathname = usePathname();
+  const [panelPath, setPanelPath] = useState(pathname);
+  if (panelPath !== pathname) {
+    setPanelPath(pathname);
+    setOpen(false);
+  }
   const narrow = useSyncExternalStore(subscribeViewport, isNarrowViewport, serverViewport);
   const [title, setTitle] = useState("");
   const [target, setTarget] = useState<HTMLDivElement | null>(null);

@@ -153,7 +153,10 @@ export function KnowledgeIndexPanel({ settingsRevision = "", available, disabled
             break;
           }
         }
-      } finally { await loadDetail(id); }
+      } finally {
+        // 刷新结果失败不能覆盖上面的原始错误（其中含可能重复计费的提示）。
+        await loadDetail(id).catch(() => { if (mounted.current) setDetailError("验收结果暂时无法读取，请稍后再查看；不必重新运行。"); });
+      }
   }
   const sourceConsent = <label className="flex items-start gap-2 text-sm"><input type="checkbox" disabled={blocked || !available} checked={consent} onChange={event => { setConsentRevision(event.target.checked ? status!.sourceRevision : null); setConsentConnection(event.target.checked ? status!.selectedConnection : null); }} className="mt-1" /><span>允许将本次需要生成向量的文字（可能包含付费正文）发送至已保存的向量供应商，可能计费；内容或连接变化后重新确认。</span></label>;
   const currentDetail = detail?.id === currentRun?.id ? detail : null;
@@ -162,7 +165,7 @@ export function KnowledgeIndexPanel({ settingsRevision = "", available, disabled
     <p role="status" aria-live="polite" className="text-sm leading-6">{message}</p>
     {!status ? <p className="text-sm">状态未读取或暂不可用，不能据此判断已完成。</p> : <>
       <ol className="grid gap-2 text-sm sm:grid-cols-5" aria-label="知识库设置步骤">{names.map((name, i) => <li key={name} aria-current={step === i + 1 ? "step" : undefined} className={`min-w-0 rounded-md p-2 ${step === i + 1 ? "bg-accent font-medium" : "text-muted-foreground"}`}>{i + 1}．{name}<span className="block text-xs">{step === i + 1 ? "当前步骤" : step > i + 1 ? "已完成" : "尚未开始"}</span></li>)}</ol>
-      {active && <p className="text-sm"><StatusBadge tone="owned">当前使用的索引</StatusBadge> 更新完成前，仍用原索引中与当前文章一致的内容回答。</p>}
+      {active && <p className="text-sm"><StatusBadge tone="success">当前使用的索引</StatusBadge> 更新完成前，仍用原索引中与当前文章一致的内容回答。</p>}
       {complete && step >= 4 && <p className="text-sm text-muted-foreground">已保存 {candidate!.counts.ready}/{candidate!.counts.total} 个向量片段，无需重新建立索引。</p>}
       <h3 ref={stepHeading} tabIndex={-1} className="font-semibold focus-visible:outline-2 focus-visible:outline-ring">{step}．{names[step - 1]}</h3>
       {step === 1 && <div className="space-y-3 text-sm">
@@ -185,13 +188,13 @@ export function KnowledgeIndexPanel({ settingsRevision = "", available, disabled
         })}>开始建立索引</Button>{active && planning && <Button type="button" variant="outline" disabled={blocked} onClick={() => { setPlanning(false); setConsentRevision(null); }}>取消本次更新</Button>}</div>
       </section>}
       {step === 3 && candidate && <section className="space-y-3 text-sm" aria-label="建立索引">
-        <p><StatusBadge tone={candidate.counts.failed ? "paused" : "registered"}>{busy ? "正在建立知识库" : candidate.counts.failed ? "部分内容需要重试" : candidate.counts.leased ? "等待当前请求确认" : "任务已暂停"}</StatusBadge></p>
+        <p><StatusBadge tone={candidate.counts.failed ? "warning" : "info"}>{busy ? "正在建立知识库" : candidate.counts.failed ? "部分内容需要重试" : candidate.counts.leased ? "等待当前请求确认" : "任务已暂停"}</StatusBadge></p>
         <p>{candidate.scanComplete ? "来源扫描完成" : "正在扫描来源，片段总数尚未确定"} · 已保存 {candidate.counts.ready}/{candidate.counts.total} 个向量片段（复用 {candidate.reusedItems ?? 0} 个）</p>
         {candidate.scanComplete && <progress aria-label="向量生成进度" className="h-2 w-full accent-primary" max={Math.max(1, candidate.counts.total)} value={candidate.counts.ready} />}
         <p className="text-muted-foreground">待处理 {candidate.counts.pending} · 执行中 {candidate.counts.leased} · 失败／未确认 {candidate.counts.failed}。已保存的片段无需重新生成。</p>
         {candidate.approvedRevision !== status.sourceRevision && <><p>文章已变化，请确认新的发送范围后继续。</p>{sourceConsent}</>}
         {!matchesConnection && <><p>向量连接与该任务不一致。请恢复原连接后继续，或在底部取消此任务再重建。</p><Button type="button" variant="outline" disabled={!!busy} onClick={onConfigure}>前往连接配置</Button></>}
-        {!busy && (candidate.counts.failed > 0 ? <><label className="flex items-start gap-2"><input type="checkbox" checked={retryConsent} disabled={blocked} onChange={event => setRetryConsent(event.target.checked)} className="mt-1" /><span>失败或未确认项可能已计费，手动重试可能产生重复费用。</span></label><Button type="button" disabled={blocked || !available || !matchesConnection || !retryConsent || (candidate.approvedRevision !== status.sourceRevision && !consent)} onClick={() => execute("仅重试未完成的向量片段…", async () => { setRetryConsent(false); const result = await request("retry", candidate.id, { consent: true }); await build(result.status.generations.find(item => item.id === candidate.id)!, result.status); })}>确认并仅重试失败项</Button></> : candidate.counts.leased > 0 ? <p>先等当前请求结束，再点击右上角“刷新状态”。此时不能重复发送。</p> : <Button type="button" disabled={blocked || !available || !matchesConnection || (candidate.approvedRevision !== status.sourceRevision && !consent)} onClick={() => execute("正在继续建立索引…", () => build(candidate, status))}>继续建立索引</Button>)}
+        {!busy && (candidate.counts.failed > 0 ? <><label className="flex items-start gap-2"><input type="checkbox" checked={retryConsent} disabled={blocked} onChange={event => setRetryConsent(event.target.checked)} className="mt-1" /><span>失败或未确认项可能已计费，手动重试可能产生重复费用。</span></label><Button type="button" disabled={blocked || !available || !matchesConnection || !retryConsent || (candidate.approvedRevision !== status.sourceRevision && !consent)} onClick={() => execute("仅重试未完成的向量片段…", async () => { setRetryConsent(false); const result = await request("retry", candidate.id, { consent: true }); const next = result.status.generations.find(item => item.id === candidate.id); if (!next) throw new Error("任务暂时无法确认，请刷新状态后再继续。"); await build(next, result.status); })}>确认并仅重试失败项</Button></> : candidate.counts.leased > 0 ? <p>先等当前请求结束，再点击右上角“刷新状态”。此时不能重复发送。</p> : <Button type="button" disabled={blocked || !available || !matchesConnection || (candidate.approvedRevision !== status.sourceRevision && !consent)} onClick={() => execute("正在继续建立索引…", () => build(candidate, status))}>继续建立索引</Button>)}
       </section>}
       {step === 4 && candidate && complete && <section className="space-y-4 text-sm" aria-label="站主确认启用">
         <p>索引已完整生成。由你决定是否用于分身回答，可以直接启用，也可以先在下方检查检索效果。</p>
@@ -206,7 +209,7 @@ export function KnowledgeIndexPanel({ settingsRevision = "", available, disabled
       </section>}
       {step === 5 && <section className="space-y-3 text-sm" aria-label="启用与提问">
         {active && <>
-          <StatusBadge tone="owned">知识库已启用</StatusBadge>
+          <StatusBadge tone="success">知识库已启用</StatusBadge>
           <p>{!generationReady ? "下一步：配置并检查生成连接，让分身能组织回答。已有知识库会保留。" : !avatarEnabled ? "下一步：开启分身开关并保存，访客才能看到问答入口。" : "分身已就绪，可以到首页实际提问。匿名提问还需完成人机校验配置。"}</p>
           {!generationReady || !avatarEnabled ? <Button type="button" disabled={blocked} onClick={onConfigure}>{!generationReady ? "配置生成连接" : "前往开启分身"}</Button> : <Button asChild><Link href="/">到首页提问</Link></Button>}
           <div className="space-y-2 border-t pt-4"><h4 className="font-medium">以后发布或修改文章时</h4><p className="text-muted-foreground">发布或修改文章后，选择“同步内容变化”。同步完成后确认切换即可，不强制重新测试。建议保留真实失败问题，在更换模型、调整检索规则或新增重要内容时做对比检查；一次测试不能保证未来回答都正确。</p><Button type="button" variant="outline" disabled={blocked} onClick={() => { setPlanning(true); setMode(active.connectionId === status.selectedConnection ? "sync" : "rebuild"); setConsentRevision(null); }}>同步内容变化</Button></div>
@@ -216,7 +219,7 @@ export function KnowledgeIndexPanel({ settingsRevision = "", available, disabled
         <summary className="cursor-pointer font-medium">可选：检查检索效果</summary>
         <p className="text-sm text-muted-foreground">用真实问题查看能否找到相关资料。结果不限制启用，也不会训练向量；无需凑题数。可随时返回检查，额外调用前会确认费用。</p>
         {pendingRun ? <div className="space-y-3 text-sm">
-          <StatusBadge tone={pendingRun.state === "failed" ? "paused" : "registered"}>{busy ? "正在检查问题" : pendingRun.state === "failed" ? "检查中断" : pendingRun.state === "leased" ? "等待当前请求确认" : "检查已暂停"}</StatusBadge>
+          <StatusBadge tone={pendingRun.state === "failed" ? "danger" : "info"}>{busy ? "正在检查问题" : pendingRun.state === "failed" ? "检查中断" : pendingRun.state === "leased" ? "等待当前请求确认" : "检查已暂停"}</StatusBadge>
           <p>已检查 {pendingRun.completed}/{pendingRun.total} 个问题。系统已保存问题和进度，继续时不需要重新导入，也不会重复处理已完成的批次。</p>
           <progress aria-label="问题检查进度" className="h-2 w-full accent-primary" max={Math.max(1, pendingRun.total)} value={pendingRun.completed} />
           {!busy && (pendingRun.state === "failed" ? <><label className="flex items-start gap-2"><input type="checkbox" checked={retryConsent} disabled={blocked} onChange={event => setRetryConsent(event.target.checked)} className="mt-1" /><span>未确认的评测可能已计费，我确认重试可能产生重复费用。</span></label><Button type="button" disabled={blocked || !available || !retryConsent} onClick={() => execute("正在继续未完成的问题检查…", async () => {

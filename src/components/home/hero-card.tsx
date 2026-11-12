@@ -1,4 +1,5 @@
 import { HeroAskBox } from "@/components/home/hero-ask-box";
+import { HeroCollapse } from "@/components/home/hero-collapse";
 import { FactBadges } from "@/components/home/fact-badges";
 import type { ResolvedFactBadge } from "@/lib/get-home";
 
@@ -7,6 +8,7 @@ import type { ResolvedFactBadge } from "@/lib/get-home";
  * 事实徽章行 + 问句输入框 + 专注/不做摘要。
  * 订阅 pill 仅左栏底部常驻（契约 2.1/2.4），Hero 内不渲染。
  * 两套横幅和前景跟随外观模式，每套未配置时使用对应内置背景。
+ * 向下滚动时由 HeroCollapse 压缩到只剩问句框的顶栏，问句框因此排在最后。
  */
 
 export const DEFAULT_HERO_BANNER = "/assets/hero-cloud-glass.svg";
@@ -41,7 +43,7 @@ export function HeroCard({
   const customDark = bannerDarkUrl && bannerDarkUrl !== DEFAULT_HERO_DARK_BANNER
     ? bannerDarkUrl : null;
   return (
-    <section
+    <HeroCollapse
       className="opc-hero"
       data-tone="theme"
       aria-label="站点介绍"
@@ -73,11 +75,11 @@ export function HeroCard({
       <div className="opc-hero__content">
         <h1>{oneLiner}</h1>
         <FactBadges facts={facts} />
+        {focusLine && <p className="opc-hero__focus">{focusLine}</p>}
         <div className="opc-hero__question">
           <HeroAskBox placeholder={askPlaceholder} />
         </div>
-        {focusLine && <p className="opc-hero__focus">{focusLine}</p>}
       </div>
-    </section>
+    </HeroCollapse>
   );
 }

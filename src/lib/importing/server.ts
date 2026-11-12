@@ -424,7 +424,7 @@ export async function uploadAsset(
   } catch {
     throw new ImportError("附件路径无效。");
   }
-  const slug = scope === "blog" ? "blog-assets" : scope.slice(7);
+  const slug = scope === "blog" ? "blog-assets" : scope === "skill" ? "skill-assets" : scope.slice(7);
   const bytes = new Uint8Array(await file.arrayBuffer());
   const hash = createHash("sha256").update(bytes).digest("hex");
   let prepared: Awaited<ReturnType<typeof prepareImageUpload>>;

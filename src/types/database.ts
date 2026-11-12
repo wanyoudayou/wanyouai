@@ -1,5 +1,5 @@
 /**
- * Row types matching supabase/legacy/schema.sql.
+ * Row types matching the maintained schema in supabase/migrations/.
  * Keep in sync with the SQL artifacts; regenerate manually when the schema changes.
  */
 

@@ -126,6 +126,9 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: test-key
 
+      - name: Section bundle budgets
+        run: npm run sections:budget
+
   browser:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -141,9 +144,18 @@ jobs:
       - name: Install Chromium for isolated UI checks
         timeout-minutes: 5
         run: |
-          # The hosted runner's preferred Azure mirror can stall before Ubuntu fallback.
+          # Hosted runners can fail to resolve or stall on a single Ubuntu mirror;
+          # apt walks this list in order, keeping the official archive as the last fallback.
           if [ -f /etc/apt/apt-mirrors.txt ]; then
-            sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+            printf '%s\tpriority:%s\n' \
+              https://mirrors.edge.kernel.org/ubuntu/ 1 \
+              http://azure.archive.ubuntu.com/ubuntu/ 2 \
+              https://archive.ubuntu.com/ubuntu/ 3 \
+              https://security.ubuntu.com/ubuntu/ 4 \
+              | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+          else
+            sudo sed -i 's#https\?://\(archive\|security\)\.ubuntu\.com/ubuntu/\?#https://mirrors.edge.kernel.org/ubuntu/#g' \
+              /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null || true
           fi
           printf 'Acquire::Retries "1";\nAcquire::http::Timeout "20";\nAcquire::https::Timeout "20";\n' | sudo tee /etc/apt/apt.conf.d/99-ci-network >/dev/null
           npx playwright install --with-deps chromium

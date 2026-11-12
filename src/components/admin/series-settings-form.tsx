@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { saveSeriesSettings } from "@/app/admin/collections/actions";
 import { manageContent } from "@/app/admin/manage-actions";
@@ -12,9 +13,6 @@ export type SeriesSettings = {
   task: string | null;
   tags: string[];
   audiences: string[];
-  nav_enabled: boolean;
-  nav_label: string | null;
-  nav_order: number;
   updated_at: string;
   status: string;
   featured: boolean;
@@ -66,7 +64,7 @@ export function SeriesSettingsForm({
         <div>
           <h2 className="text-lg font-semibold">专辑设置</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            统一设置展示信息、价格和导航。保存后，再到下方核对待发布更新。
+            统一设置展示信息与价格；侧栏位置在「站点设置 › 导航」管理。保存后，再到下方核对待发布更新。
           </p>
         </div>
         <input type="hidden" name="id" value={series.id} />
@@ -144,33 +142,13 @@ export function SeriesSettingsForm({
             />
             置顶精选
           </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              name="nav_enabled"
-              defaultChecked={series.nav_enabled}
-            />
-            加入侧栏目录
-          </label>
-          <label className="space-y-2 text-sm">
-            侧栏名称
-            <Input
-              name="nav_label"
-              maxLength={80}
-              defaultValue={series.nav_label ?? ""}
-              placeholder="留空使用标题"
-            />
-          </label>
-          <label className="space-y-2 text-sm">
-            目录顺序
-            <Input
-              name="nav_order"
-              type="number"
-              min={-10000}
-              max={10000}
-              defaultValue={series.nav_order}
-            />
-          </label>
+          <p className="text-sm text-muted-foreground sm:col-span-2">
+            加入左侧栏：前往{" "}
+            <Link href="/admin/navigation" className="text-primary underline-offset-4 hover:underline">
+              导航管理
+            </Link>
+            添加本专辑。
+          </p>
         </fieldset>
         <div className="flex flex-wrap items-center gap-3">
           <Button disabled={pending || transitioning || locked}>
@@ -254,7 +232,7 @@ export function SeriesSettingsForm({
                     暂停满三个月后才可归档；归档后停止阅读且不可恢复。
                   </p>
                   <label className="flex items-center gap-2 text-sm">
-                    <input name="archive_notice" type="checkbox" />
+                    <input name="archive_notice" type="checkbox" required />
                     确认停止阅读并归档
                   </label>
                   <Button

@@ -20,10 +20,10 @@ async function callManage(id: string, updated: string, action: string, value: Re
   return result;
 }
 
-/** 状态推进（婉拒 / 开始交付 / 代验收 / 结案）。报价与交付走带内容的 quoteBooking / deliverBooking。 */
+/** 状态推进（婉拒 / 开始交付 / 结案）。验收只能由客户操作；报价与交付走带内容的 quoteBooking / deliverBooking。 */
 export async function advanceBooking(_previous: Result, form: FormData) {
   const next = String(form.get("next") ?? "");
-  if (!["declined", "in_progress", "accepted", "settled"].includes(next)) return { ok: false, message: "流转目标无效" };
+  if (!["declined", "in_progress", "settled"].includes(next)) return { ok: false, message: "流转目标无效" };
   const result = await callManage(String(form.get("id") ?? ""), String(form.get("updated") ?? ""), "status", { status: next });
   if (result.ok && next === "in_progress") await notifyClientStarted(Number(form.get("id")));
   return result;

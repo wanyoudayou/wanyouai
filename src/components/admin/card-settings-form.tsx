@@ -58,7 +58,7 @@ export function CardSettingsForm({
       <fieldset disabled={pending} className="space-y-6">
         <p className="rounded-lg bg-muted px-3 py-2 text-xs leading-[1.7] text-muted-foreground">
           这里管「你是谁」：首次保存请填写站名、站主、一句话，以及联系邮箱或预约页面；服务语言使用
-          zh-CN、en 这样的代码。首页外观、收款与分身请去「站点配置」。
+          zh-CN、en 这样的代码。首页外观与收款请去「站点配置」，分身请去「AI 设置」。
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
           {fields.map(([name, label, value]) =>

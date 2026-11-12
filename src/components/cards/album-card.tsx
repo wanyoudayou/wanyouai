@@ -1,3 +1,4 @@
+import { GeneratedCover } from "@/components/cards/generated-cover";
 import {
   BookOpenIcon,
   CalendarDaysIcon,
@@ -12,8 +13,7 @@ import {
 } from "@/components/cards/content-card";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { formatDateTime, formatPrice } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { formatDateTime, formatPrice, formatTicketPrice } from "@/lib/format";
 import type { SeriesType } from "@/types/database";
 import type { AlbumCardData, AlbumManifestItem } from "@/types/content";
 
@@ -32,21 +32,6 @@ const EVENT_STATE_META = {
   registering: { tone: "event-registering" as const, label: "报名中" },
   ended: { tone: "event-ended" as const, label: "已结束" },
 };
-
-export function AlbumCoverPlaceholder({
-  kind,
-  className,
-}: {
-  kind: SeriesType;
-  className?: string;
-}) {
-  const { Icon } = KIND_META[kind];
-  return (
-    <div className={cn("opc-content-card-placeholder", className)} aria-hidden>
-      <Icon className="size-5" />
-    </div>
-  );
-}
 
 function ManifestPreview({ files }: { files: AlbumManifestItem[] }) {
   return (
@@ -101,7 +86,7 @@ export function AlbumCard({
         ) : data.manifest && data.manifest.length > 0 ? (
           <ManifestPreview files={data.manifest} />
         ) : (
-          <AlbumCoverPlaceholder kind={data.kind} />
+          <GeneratedCover title={data.title} Icon={kind.Icon} />
         )}
         <ContentCardChip>{data.tags[0] ?? kind.label}</ContentCardChip>
       </div>
@@ -136,11 +121,7 @@ export function AlbumCard({
                   {formatDateTime(event.startsAt, timezone)}
                 </time>
                 <span>
-                  {event.ticketPrice === null
-                    ? "票价待定"
-                    : event.ticketPrice === 0
-                      ? "免费参加"
-                      : `票价 ${formatPrice(event.ticketPrice, data.currency)}`}
+                  {formatTicketPrice(event.ticketPrice, data.currency)}
                 </span>
               </>
             ) : null}

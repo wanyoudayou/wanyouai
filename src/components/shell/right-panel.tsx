@@ -5,6 +5,8 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -34,7 +36,7 @@ import {
 import { CardPanel } from "@/components/card/card-panel";
 import { cn } from "@/lib/utils";
 import type { PanelPlaceholder } from "@/types/panel";
-import { TurnstileWidget } from "@/components/shared/turnstile-widget";
+import { TurnstileChallenge } from "@/components/shared/turnstile-challenge";
 
 // 气泡 Markdown 渲染与正文同一管线，按需分包加载（首条分身回复时才拉取）。
 const ChatMarkdown = dynamic(
@@ -62,7 +64,7 @@ interface MentionItem {
 
 interface RightPanelApi {
   available: boolean;
-  ask: (question: string, pins?: string[], turnstileToken?: string) => void;
+  ask: (question: string, pins?: string[]) => Promise<boolean>;
   escalate: (message: string) => void;
   setPlaceholder: (placeholder: PanelPlaceholder) => void;
 }
@@ -77,7 +79,7 @@ export function isAvatarPage(pathname: string): boolean {
 
 const RightPanelContext = createContext<RightPanelApi>({
   available: false,
-  ask: () => {},
+  ask: async () => false,
   escalate: () => {},
   setPlaceholder: () => {},
 });
@@ -142,9 +144,10 @@ function ThinkingBubble() {
       <p
         className="rounded-lg border bg-muted/50 px-3 py-2 text-sm text-muted-foreground"
         role="status"
-        aria-label="分身正在思考"
       >
-        思考中{".".repeat(dots)}
+        {/* 读屏只播报一次固定文案；动画点不进入可访问名称，避免每 400ms 重复播报。 */}
+        <span className="sr-only">分身正在思考</span>
+        <span aria-hidden>思考中{".".repeat(dots)}</span>
         <span className="invisible" aria-hidden>
           {".".repeat(3 - dots)}
         </span>
@@ -159,29 +162,27 @@ function ChatPanel({
   onAsk,
   onEscalate,
   placeholder,
-  needTurnstile,
-  turnstileSiteKey,
   className,
 }: {
   messages: ChatMessage[];
   sending: boolean;
-  onAsk: (question: string, pins: string[], turnstileToken?: string) => void;
+  onAsk: (question: string, pins: string[], room?: string | null) => Promise<boolean>;
   onEscalate: (message: string) => void;
   placeholder: PanelPlaceholder;
-  needTurnstile: boolean;
-  turnstileSiteKey: string | null;
   className?: string;
 }) {
   const [draft, setDraft] = useState("");
   const [chips, setChips] = useState<MentionItem[]>([]);
   const [candidates, setCandidates] = useState<MentionItem[]>([]);
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const [turnstileKey, setTurnstileKey] = useState(0);
+  const [activeCandidate, setActiveCandidate] = useState(0);
+  const listId = useId();
   const [escalating, setEscalating] = useState(false);
   const [escalation, setEscalation] = useState("");
   const mentionMatch = /@([^\s@]{0,30})$/.exec(draft);
   useEffect(() => {
     const q = mentionMatch?.[1];
+    // 每次输入变化取消上一次请求，旧结果不会覆盖新候选。
+    const controller = new AbortController();
     const timer = setTimeout(
       async () => {
         if (q === undefined) {
@@ -191,16 +192,22 @@ function ChatPanel({
         try {
           const res = await fetch(
             `/api/avatar/mentions?q=${encodeURIComponent(q)}`,
+            { signal: controller.signal },
           );
           const data = await res.json();
+          if (controller.signal.aborted) return;
           setCandidates(Array.isArray(data.items) ? data.items : []);
+          setActiveCandidate(0);
         } catch {
-          setCandidates([]);
+          if (!controller.signal.aborted) setCandidates([]);
         }
       },
       q === undefined ? 0 : 250,
     );
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mentionMatch?.[0]]);
 
@@ -212,21 +219,26 @@ function ChatPanel({
     );
     setDraft((prev) => prev.replace(/@[^\s@]{0,30}$/, ""));
     setCandidates([]);
+    setActiveCandidate(0);
   };
 
-  const submit = () => {
+  // @ 候选按组合框模式支持键盘：上下选择，回车/Tab 选中，Esc 关闭。
+  const mentionKeys = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!candidates.length) return false;
+    const last = candidates.length - 1;
+    if (event.key === "ArrowDown") { event.preventDefault(); setActiveCandidate((i) => (i >= last ? 0 : i + 1)); return true; }
+    if (event.key === "ArrowUp") { event.preventDefault(); setActiveCandidate((i) => (i <= 0 ? last : i - 1)); return true; }
+    if ((event.key === "Enter" && !event.shiftKey) || event.key === "Tab") { event.preventDefault(); pickMention(candidates[Math.min(activeCandidate, last)]); return true; }
+    if (event.key === "Escape") { event.preventDefault(); setCandidates([]); setActiveCandidate(0); return true; }
+    return false;
+  };
+
+  const submit = async () => {
     const question = draft.trim();
     if (!question || sending) return;
-    if (needTurnstile && !turnstileToken) return;
-    onAsk(
-      question,
-      chips.map((c) => c.slug),
-      turnstileToken ?? undefined,
-    );
+    if (!(await onAsk(question, chips.map((c) => c.slug)))) return;
     setDraft("");
     setChips([]);
-    setTurnstileToken(null);
-    setTurnstileKey((k) => k + 1); // Turnstile token 一次性，重挂组件取新 token
   };
 
   return (
@@ -262,12 +274,14 @@ function ChatPanel({
       )}
       <div className="relative border-t p-3">
         {candidates.length > 0 && (
-          <ul className="absolute inset-x-3 bottom-full z-10 mb-1 max-h-48 overflow-y-auto rounded-lg border bg-popover shadow-md">
-            {candidates.map((item) => (
-              <li key={item.slug}>
+          <ul id={listId} role="listbox" aria-label="引用站内内容" className="absolute inset-x-3 bottom-full z-10 mb-1 max-h-48 overflow-y-auto rounded-lg border bg-popover shadow-md">
+            {candidates.map((item, index) => (
+              <li key={item.slug} id={`${listId}-${index}`} role="option" aria-selected={index === activeCandidate}>
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/60"
+                  tabIndex={-1}
+                  className={cn("flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/60", index === activeCandidate && "bg-muted/60")}
+                  onMouseDown={(event) => event.preventDefault()}
                   onClick={() => pickMention(item)}
                 >
                   <AtSignIcon className="size-3.5 shrink-0 text-muted-foreground" />
@@ -279,13 +293,6 @@ function ChatPanel({
               </li>
             ))}
           </ul>
-        )}
-        {needTurnstile && turnstileSiteKey && (
-          <TurnstileWidget
-            key={turnstileKey}
-            siteKey={turnstileSiteKey}
-            onToken={setTurnstileToken}
-          />
         )}
         {escalating ? (
           <div className="space-y-2">
@@ -325,7 +332,8 @@ function ChatPanel({
         ) : (
           <>
             <ConversationComposer value={draft} onChange={setDraft} onSubmit={submit} disabled={sending}
-              sendDisabled={needTurnstile && !turnstileToken} label="向站主的分身提问" placeholder="向站主的分身提问…（@ 引用站内内容）" maxLength={2000} />
+              label="向站主的分身提问" placeholder="向站主的分身提问…（@ 引用站内内容）" maxLength={2000}
+              combobox={{ expanded: candidates.length > 0, listId, activeId: `${listId}-${activeCandidate}`, onKey: mentionKeys }} />
             <div className="mt-2 flex items-center justify-between gap-2">
               <Button
                 type="button"
@@ -352,12 +360,9 @@ interface PanelState {
   messages: ChatMessage[];
   sending: boolean;
   placeholder: PanelPlaceholder;
-  onAsk: (question: string, pins: string[], turnstileToken?: string) => void;
+  onAsk: (question: string, pins: string[], room?: string | null) => Promise<boolean>;
   onEscalate: (message: string) => void;
-  avatarModel: string | null;
   avatarEnabled: boolean;
-  needTurnstile: boolean;
-  turnstileSiteKey: string | null;
 }
 
 const RightPanelStateContext = createContext<PanelState | null>(null);
@@ -429,17 +434,18 @@ function RightPanelContent() {
   const { onAsk } = state;
   const articleSlug = reading?.articleSlug ?? null;
   const ask = useCallback(
-    (question: string, pins: string[], turnstileToken?: string) => {
+    (question: string, pins: string[]) => {
       // 钉载：文章页自动带当前章节 slug（可信来源 = 服务端渲染上下文，不含正文）
       const merged = [...(articleSlug ? [articleSlug] : []), ...pins].slice(
         0,
         4,
       );
       setCollapsed(false);
-      onAsk(question, merged, turnstileToken);
       if (window.innerWidth < 1280) {
         openSheet();
       }
+      // 会话归属由页面显式给出，不从 @ 引用推断。
+      return onAsk(question, merged, articleSlug);
     },
     [onAsk, openSheet, articleSlug, setCollapsed],
   );
@@ -492,8 +498,6 @@ function RightPanelContent() {
               onAsk={ask}
               onEscalate={state.onEscalate}
               placeholder={state.placeholder}
-              needTurnstile={state.needTurnstile}
-              turnstileSiteKey={state.turnstileSiteKey}
             />
           </TabsContent>
           <TabsContent
@@ -510,8 +514,6 @@ function RightPanelContent() {
           onAsk={ask}
           onEscalate={state.onEscalate}
           placeholder={state.placeholder}
-          needTurnstile={state.needTurnstile}
-          turnstileSiteKey={state.turnstileSiteKey}
         />
       )}
     </div>
@@ -571,14 +573,12 @@ function RightPanelContent() {
 }
 
 export function RightPanelProvider({
-  avatarModel,
   avatarEnabled,
   avatarAnonymous,
   turnstileSiteKey,
   loggedIn,
   children,
 }: {
-  avatarModel: string | null;
   avatarEnabled: boolean;
   avatarAnonymous: boolean;
   turnstileSiteKey: string | null;
@@ -591,11 +591,20 @@ export function RightPanelProvider({
     kind: "default",
   });
   const [collapsed, setCollapsed] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const requestRunning = useRef(false);
+  const askController = useRef<AbortController | null>(null);
+  const verificationOrigin = useRef<HTMLElement | null>(null);
+  const pendingVerification = useRef<
+    | { kind: "ask"; question: string; pins: string[]; room: string | null; resolve: (accepted: boolean) => void }
+    | { kind: "escalate"; message: string; resolve: (accepted: boolean) => void }
+    | null
+  >(null);
 
   const needTurnstile = !loggedIn && avatarAnonymous && !!turnstileSiteKey;
 
-  const ask = useCallback(
-    async (question: string, pins: string[] = [], turnstileToken?: string) => {
+  const sendQuestion = useCallback(
+    async (question: string, pins: string[] = [], turnstileToken?: string, room: string | null = null) => {
       if (!avatarEnabled) {
         setMessages((prev) => [
           ...prev,
@@ -608,15 +617,20 @@ export function RightPanelProvider({
         ]);
         return;
       }
+      requestRunning.current = true;
+      const controller = new AbortController();
+      askController.current = controller;
       setMessages((prev) => [...prev, { role: "user", content: question }]);
       setSending(true);
       try {
         const res = await fetch("/api/avatar/ask", {
           method: "POST",
+          signal: controller.signal,
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             question,
             pins,
+            ...(room ? { room } : {}),
             ...(turnstileToken ? { turnstileToken } : {}),
           }),
         });
@@ -671,13 +685,15 @@ export function RightPanelProvider({
           { role: "avatar", content: "网络异常，请稍后再试。" },
         ]);
       } finally {
+        if (askController.current === controller) askController.current = null;
+        requestRunning.current = false;
         setSending(false);
       }
     },
     [avatarEnabled],
   );
 
-  const escalate = useCallback(async (message: string) => {
+  const sendEscalation = useCallback(async (message: string, turnstileToken?: string) => {
     setMessages((prev) => [
       ...prev,
       { role: "user", content: `【转人工】${message}` },
@@ -686,25 +702,79 @@ export function RightPanelProvider({
       const res = await fetch("/api/avatar/escalate", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, ...(turnstileToken ? { turnstileToken } : {}) }),
       });
       const data = (await res.json().catch(() => null)) as {
         message?: string;
       } | null;
+      // 只有服务端确认落箱才告知“已转达”；其余一律展示失败原因。
       setMessages((prev) => [
         ...prev,
         {
           role: "avatar",
-          content: data?.message ?? "已转达站主，会尽快回复。",
+          content: res.ok
+            ? (data?.message ?? "已转达站主，会尽快回复。")
+            : (data?.message ?? "转人工暂时不可用，留言未送达，请稍后再试。"),
         },
       ]);
     } catch {
       setMessages((prev) => [
         ...prev,
-        { role: "avatar", content: "网络异常，请稍后再试。" },
+        { role: "avatar", content: "网络异常，留言未送达，请稍后再试。" },
       ]);
     }
   }, []);
+
+  const escalate = useCallback((message: string): Promise<boolean> => {
+    if (!message.trim() || pendingVerification.current) return Promise.resolve(false);
+    if (needTurnstile) {
+      verificationOrigin.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      return new Promise(resolve => {
+        pendingVerification.current = { kind: "escalate", message, resolve };
+        setVerifying(true);
+      });
+    }
+    void sendEscalation(message);
+    return Promise.resolve(true);
+  }, [needTurnstile, sendEscalation]);
+
+  const ask = useCallback((question: string, pins: string[] = [], room: string | null = null): Promise<boolean> => {
+    if (!question.trim() || requestRunning.current || pendingVerification.current) return Promise.resolve(false);
+    if (avatarEnabled && needTurnstile) {
+      verificationOrigin.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      return new Promise(resolve => {
+        pendingVerification.current = { kind: "ask", question, pins: [...pins], room, resolve };
+        setVerifying(true);
+      });
+    }
+    void sendQuestion(question, pins, undefined, room);
+    return Promise.resolve(true);
+  }, [avatarEnabled, needTurnstile, sendQuestion]);
+
+  const cancelVerification = useCallback(() => {
+    const pending = pendingVerification.current;
+    pendingVerification.current = null;
+    setVerifying(false);
+    pending?.resolve(false);
+  }, []);
+
+  const finishVerification = useCallback((token: string) => {
+    const pending = pendingVerification.current;
+    if (!pending || !token) return;
+    pendingVerification.current = null;
+    setVerifying(false);
+    if (pending.kind === "ask") void sendQuestion(pending.question, pending.pins, token, pending.room);
+    else void sendEscalation(pending.message, token);
+    pending.resolve(true);
+  }, [sendQuestion, sendEscalation]);
+
+  useEffect(() => () => {
+    pendingVerification.current?.resolve(false);
+    pendingVerification.current = null;
+    // 面板卸载时中止进行中的流式回答，服务端随请求取消停止生成。
+    askController.current?.abort();
+  }, []);
+
 
   const handleSetPlaceholder = useCallback((next: PanelPlaceholder) => {
     setPlaceholder(next);
@@ -722,13 +792,16 @@ export function RightPanelProvider({
             placeholder,
             onAsk: ask,
             onEscalate: escalate,
-            avatarModel,
             avatarEnabled,
-            needTurnstile,
-            turnstileSiteKey,
           }}
         >
           {children}
+          {verifying && turnstileSiteKey && <TurnstileChallenge
+            siteKey={turnstileSiteKey}
+            onVerified={finishVerification}
+            onCancel={cancelVerification}
+            onRestoreFocus={() => { if (verificationOrigin.current?.isConnected) verificationOrigin.current.focus(); }}
+          />}
         </RightPanelStateContext.Provider>
       </RightPanelContext.Provider>
     </RightPanelCollapseContext.Provider>

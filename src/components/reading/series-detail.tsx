@@ -35,7 +35,7 @@ export function SeriesDetail({ data, site, viewer, registration }: { data: Serie
       <h1 className="text-3xl leading-snug font-medium break-words">{series.title}</h1>
       <p className="text-base leading-relaxed text-muted-foreground">{series.task ?? reading?.article.summary}</p>
       <div className="flex flex-wrap items-center gap-2"><StatusBadge tone="free">README 公开</StatusBadge>{series.status === "paused" ? <StatusBadge tone="paused">已停售</StatusBadge> : null}
-        {series.type !== "event" ? <span className="text-sm text-muted-foreground">{price === 0 ? "免费内容" : `专辑 ${formatPrice(Number(price), currency)}`}</span> : null}
+        {series.type !== "event" ? <span className="text-sm text-muted-foreground">{price === 0 ? "免费内容" : `${series.type === "skill" ? "技能" : "专辑"} ${formatPrice(Number(price), currency)}`}</span> : null}
       </div>
       <AudienceChips audiences={series.audiences} />
       {reading?.article.cover_url ? <ContentImage src={reading.article.cover_url} /> : null}
@@ -43,7 +43,7 @@ export function SeriesDetail({ data, site, viewer, registration }: { data: Serie
     </header> : reading ? <ArticleHeader article={reading.article} timezone={site.identity.timezone} /> : null}
     {series.type === "event" ? <>
       <RegistrationCallout event={event} timezone={site.identity.timezone} currency={currency} paused={series.status === "paused"} />
-      {event && registration ? <div className="mt-3"><EventRegisterPanel seriesId={series.id} state={event.state} eligibility={registration.eligibility} registered={registration.row} loggedIn={viewer.loggedIn} /></div> : null}
+      {event && registration ? <div className="mt-3"><EventRegisterPanel seriesId={series.id} state={event.state} eligibility={registration.eligibility} registered={registration.row} loggedIn={viewer.loggedIn} currency={site.commerce.subscriptionPrice?.currency ?? "CNY"} /></div> : null}
     </> : null}
     {reading ? <><ProseReader markdown={reading.markdown} />{!reading.full ? <PaywallBlock article={reading.article} series={series} event={event} commerce={site.commerce} viewer={viewer} /> : null}</> : <EmptyState Icon={BookOpenIcon} title="编写中" description="内容介绍正在整理。" />}
     {isReadme ? <section className="space-y-3 border-t pt-6"><h2 className="text-lg font-medium">章节目录</h2>

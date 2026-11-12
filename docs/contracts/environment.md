@@ -102,7 +102,7 @@ Auth Site URL 使用 `SITE_URL`，Redirect URLs 加入 `${SITE_URL}/auth/callbac
 | `PUBLISH_TOKEN` | 可调用 | 兼容接受 |
 | `CRON_SECRET` | 不可调用 | 可调用 |
 
-维护任务当前同时接受两个值，即使已配置 `CRON_SECRET`，`PUBLISH_TOKEN` 仍被接受；这是已有外部调度及人工调用可继续使用的兼容路径，不是 Vercel 自动借用另一变量。Vercel 自带 Cron 只读取约定名称 **`CRON_SECRET`**，自动发送 `Authorization: Bearer <CRON_SECRET>`，不会读取 `PUBLISH_TOKEN`。仅配置后者不能让 Vercel Cron 自动通过鉴权。见 [Vercel Cron 鉴权](https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs)。
+维护任务当前同时接受两个值（均须至少 32 个字符，短于此的值一律不被接受），即使已配置 `CRON_SECRET`，`PUBLISH_TOKEN` 仍被接受；这是已有外部调度及人工调用可继续使用的兼容路径，不是 Vercel 自动借用另一变量。Vercel 自带 Cron 只读取约定名称 **`CRON_SECRET`**，自动发送 `Authorization: Bearer <CRON_SECRET>`，不会读取 `PUBLISH_TOKEN`。仅配置后者不能让 Vercel Cron 自动通过鉴权。见 [Vercel Cron 鉴权](https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs)。
 
 新装将两者分别生成、使用不同值：`PUBLISH_TOKEN` 留给发布工具，`CRON_SECRET` 交给调度器。这样调度凭据泄露不会同时获得发布权限，轮换调度密钥也不必修改发布工具；设为同一值会失去这两项隔离效果。
 
@@ -151,6 +151,8 @@ Site Key 与开关存于匿名可读的 `site_config.turnstile_config`；Secret 
 `TEST_DATABASE_URL` 只供隔离 PostgreSQL 并发/规模测试，要求 PostgreSQL 17+ / pgvector，地址仅接受 localhost/127.0.0.1/::1。工具创建随机库并在结束后删除；不加载 Supabase env，不指向业务库，不配置到 Vercel。详见[并发测试](../development/database-concurrency.md)。
 
 该值来自**自己启动的一次性本机 PostgreSQL**，格式为 `postgresql://用户名:密码@127.0.0.1:端口/postgres`；账号须有创建/删除测试库权限。不是从 Supabase Connect 复制远程业务库连接串。只部署网站、不运行并发/规模测试时无需填写。
+
+`VERCEL_GIT_COMMIT_SHA` 由 Vercel 在构建与运行时自动提供，后台导航页只读显示其前 7 位以便核对部署版本；部署者无需填写，不进入 `.env.example`，缺失时不显示。
 
 本地复制模板到 `.env.local` 后运行 doctor 和 dev。Next.js 的进程环境优先，其次按运行模式加载 `.env.<mode>.local`、`.env.local`、`.env.<mode>`、`.env`；保留一份明确的本地配置，避免旧覆盖文件改变目标项目。
 

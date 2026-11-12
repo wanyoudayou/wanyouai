@@ -1,4 +1,5 @@
 import { NewspaperIcon } from "lucide-react";
+import { GeneratedCover } from "@/components/cards/generated-cover";
 
 import {
   ContentCard,
@@ -23,9 +24,7 @@ export function ArticleCard({
           // eslint-disable-next-line @next/next/no-img-element -- Cover is hosted or configured by the site owner.
           <img src={data.coverUrl} alt="" className="opc-content-card-image" />
         ) : (
-          <div className="opc-content-card-placeholder" aria-hidden>
-            <NewspaperIcon className="size-5" />
-          </div>
+          <GeneratedCover title={data.title} Icon={NewspaperIcon} />
         )}
         <ContentCardChip>{data.tags[0] ?? "文章"}</ContentCardChip>
       </div>

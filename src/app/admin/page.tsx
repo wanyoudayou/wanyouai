@@ -8,7 +8,7 @@ import Link from "next/link";
 import { getAdminIdentity } from "@/lib/admin/session";
 import { AdminLoginForm } from "@/components/admin/admin-login-form";
 import { redirect } from "next/navigation";
-import { AdminDashboard } from "@/components/admin/admin-dashboard";
+import { AdminDashboard, AdminTodo } from "@/components/admin/admin-dashboard";
 import { Button } from "@/components/ui/button";
 import { signOutAdmin } from "./actions";
 export const metadata: Metadata = {
@@ -35,8 +35,8 @@ export default async function AdminPage({
   if (tab && legacy[tab])
     redirect(`/admin/${legacy[tab]}${listQueryString(parseListQuery(raw))}`);
   return (
-    <div className="mx-auto max-w-5xl space-y-8 px-6 py-12 lg:px-8">
-      <h1 className="text-2xl font-medium">站主后台</h1>
+    <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+      <h1 className="text-2xl font-semibold">站主后台</h1>
       {notice === "invalid-link" && (
         <p role="alert" className="text-sm text-muted-foreground">
           登录链接无效、已过期，或站主身份暂时无法验证，请重新申请。
@@ -66,53 +66,40 @@ export default async function AdminPage({
         </>
       ) : (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="break-all text-sm text-muted-foreground">
               {identity.user.email}
             </p>
-            <div className="flex items-center gap-2">
-              {identity.owner && (
-                <Button asChild variant="outline">
-                  <a
-                    href="/admin/export"
-                    download
-                    aria-describedby="export-purpose"
-                  >
-                    导出内容与数据
-                  </a>
-                </Button>
-              )}
-              <form action={signOutAdmin}>
-                <Button type="submit" variant="outline">
-                  退出登录
-                </Button>
-              </form>
-            </div>
+            <form action={signOutAdmin}>
+              <Button type="submit" variant="ghost" size="sm">
+                退出登录
+              </Button>
+            </form>
           </div>
           {identity.owner ? (
             <>
-              <p id="export-purpose" className="text-sm text-muted-foreground">
-                导出文章供阅读编辑，导出业务表格供统计对账。图片附件需另存；导出包不支持整站恢复。
-              </p>
+              <AdminTodo />
+              <section aria-labelledby="metrics-heading" className="space-y-3">
+                <h2 id="metrics-heading" className="text-base font-medium">本月数据</h2>
+                <AdminDashboard />
+              </section>
               <p className="text-sm text-muted-foreground">
                 首次部署或更新配置后，打开
                 <Link
                   href="/admin/setup"
-                  className="ml-1 underline underline-offset-4"
+                  className="mx-1 text-primary underline underline-offset-4"
                 >
-                  部署检查与首次配置
+                  部署检查
                 </Link>
-                ，按步骤完成名片、内容和功能验收。
+                按步骤完成验收；导出内容与业务数据在
+                <Link
+                  href="/admin/maintenance"
+                  className="mx-1 text-primary underline underline-offset-4"
+                >
+                  数据导出与维护
+                </Link>
+                。
               </p>
-              <AdminDashboard />
-              <section className="grid gap-3 sm:grid-cols-2">
-                <Button asChild>
-                  <Link href="/admin/articles">管理内容</Link>
-                </Button>
-                <Button asChild variant="outline">
-                  <Link href="/admin/payments">查看收款与权益</Link>
-                </Button>
-              </section>
             </>
           ) : !hasOwnerNotice ? (
             <p role="alert" className="text-sm text-muted-foreground">

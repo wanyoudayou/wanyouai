@@ -26,6 +26,11 @@ test('events: 资格判定矩阵',()=>{
   assert.equal(checkEligibility(reader(),ev({state:'upcoming'})).action,'closed');
   assert.equal(checkEligibility(reader(),ev({state:'ended'})).action,'closed');
   assert.equal(checkEligibility(reader(),ev({status:'draft'})).action,'closed');
+  // 暂停停售不停读：持票人仍可报名；未持票者关闭；结束后持票人也关闭
+  assert.deepEqual(checkEligibility(reader([ticket(UID,7)]),ev({status:'paused',ticket_price:99})),{action:'register',reason:'ticket'});
+  assert.equal(checkEligibility(reader(),ev({status:'paused'})).action,'closed');
+  assert.equal(checkEligibility(reader([ticket(UID,7)]),ev({status:'archived',ticket_price:99})).action,'closed');
+  assert.equal(checkEligibility(reader([ticket(UID,7)]),ev({state:'ended',ticket_price:99})).action,'closed');
   // 过期订阅无效
   const expired=[{user_id:UID,type:'subscription' as const,target_id:null,ends_at:'2020-01-01T00:00:00Z',revoked_at:null}];
   assert.deepEqual(checkEligibility(reader(expired),ev({kind:'member'})),{action:'subscription_required'});
@@ -141,4 +146,63 @@ test('roster csv: 报名名单导出（M3-S6）',async()=>{
   // 未知状态原样输出；空名单只有表头
   assert.ok(buildRosterCsv([{email:'d@example.com',status:'mystery',created_at:'t'}]).includes('mystery'));
   assert.equal(buildRosterCsv([]),'email,status,registered_at\n');
+  // 公式注入：= + - @ 开头的文本加 ' 前缀；回车也加引号；纯数字保持原样
+  const {csvCell}=await import('../src/lib/admin/csv');
+  assert.equal(buildRosterCsv([{email:'=HYPERLINK("http://x")@a.test',status:'registered',created_at:'t'}]).split('\n')[1],`"'=HYPERLINK(""http://x"")@a.test",已报名,t`);
+  for(const v of ['+1','-cmd','@SUM(A1)','\tx']) assert.ok(csvCell(v).replace(/^"/,'').startsWith("'"),v);
+  assert.equal(csvCell('-5'),'-5');
+  assert.equal(csvCell('12.50'),'12.50');
+  assert.equal(csvCell('a\rb'),'"a\rb"');
+  assert.equal(csvCell(null),'');
+});
+
+test('events: register_for_event 在活动行锁内裁决资格与名额（PGlite）',async t=>{
+  const {PGlite}=await import('@electric-sql/pglite');
+  const {vector}=await import('@electric-sql/pglite-pgvector');
+  const db=new PGlite({extensions:{vector}});t.after(()=>db.close());
+  await installTestDatabase(db);
+  const A='00000000-0000-4000-8000-0000000000a1',B='00000000-0000-4000-8000-0000000000b2',C='00000000-0000-4000-8000-0000000000c3';
+  await db.exec('reset role');
+  for(const [id,mail] of [[A,'a@example.test'],[B,'b@example.test'],[C,'c@example.test']]) await db.query('insert into auth.users(id,email,email_confirmed_at) values($1,$2,now())',[id,mail]);
+  const login=async(id:string|null)=>{await db.exec('reset role;reset request.jwt.claims;set role '+(id?'authenticated':'anon'));if(id)await db.query("select set_config('request.jwt.claims',$1,false)",[JSON.stringify({sub:id,role:'authenticated'})]);};
+  const register=async(series:number)=>(await db.query<{r:{ok:boolean;code?:string;status?:string;checkin_token?:string}}>('select register_for_event($1) r',[series])).rows[0].r;
+  const order=async(user:string,series:number,amount:number)=>db.query('select create_pending_order($1,$2,$3,$4) o',[user,'event',series,amount]);
+
+  // 免费开放活动，名额 1：第一位成功，第二位满员，重复报名复用原记录
+  await db.exec('reset role');
+  const free=(await db.query<{id:number}>(`insert into series(slug,title,type,status) values ('ev-cap','名额活动','event','published') returning id`)).rows[0].id;
+  await db.query(`insert into event_details(series_id,starts_at,state,ticket_price,kind,capacity) values ($1,now()+interval '7 days','registering',0,'open','1 人')`,[free]);
+  await login(null);
+  await assert.rejects(register(free),/permission denied/);
+  await login(A);
+  const first=await register(free);
+  assert.equal(first.ok,true);
+  assert.equal((await register(free)).checkin_token,first.checkin_token);
+  await login(B);
+  assert.equal((await register(free)).code,'FULL');
+
+  // 收费活动，名额 1：A 持票后售罄，B 不能再买；暂停后 A 仍能报名，C 关闭
+  await db.exec('reset role');
+  const paid=(await db.query<{id:number}>(`insert into series(slug,title,type,status) values ('ev-ticket','收费活动','event','published') returning id`)).rows[0].id;
+  await db.query(`insert into event_details(series_id,starts_at,state,ticket_price,kind,capacity) values ($1,now()+interval '7 days','registering',99,'open','1')`,[paid]);
+  await db.exec('set role service_role');
+  await order(A,paid,99);
+  await db.exec('reset role');
+  await db.query(`insert into entitlements(user_id,type,target_id,source,source_ref) values ($1,'event',$2,'admin','test-ticket')`,[A,paid]);
+  await db.exec('set role service_role');
+  await assert.rejects(order(B,paid,99),/NOT_SELLABLE/);
+  await db.exec('reset role');
+  await db.query(`update series set status='paused',paused_at=now() where id=$1`,[paid]);
+  await login(A);
+  const ticketRegistration=await register(paid);
+  assert.equal(ticketRegistration.ok,true);
+  await login(C);
+  assert.equal((await register(paid)).code,'CLOSED');
+
+  // 结束后持票人也不能再报名；匿名/普通角色不能直接写名单
+  await db.exec('reset role');
+  await db.query(`update event_details set state='ended' where series_id=$1`,[free]);
+  await login(B);
+  assert.equal((await register(free)).code,'CLOSED');
+  await assert.rejects(db.query(`insert into registrations(series_id,user_id,email) values ($1,$2,'b@example.test')`,[free,B]),/permission denied/);
 });

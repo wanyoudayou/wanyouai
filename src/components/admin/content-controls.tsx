@@ -37,6 +37,12 @@ export function ContentControls({
   });
   const [requestId, setRequestId] = useState("");
   const [operation, setOperation] = useState("");
+  // 操作成功后收起确认按钮并清空请求号：再次操作会生成新请求，不会重放上一次的结果。
+  const [handled, setHandled] = useState(state);
+  if (handled !== state) {
+    setHandled(state);
+    if (state.ok) { setOperation(""); setRequestId(""); }
+  }
   const editEntry =
     kind === "article" ? (
       <Button

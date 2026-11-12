@@ -7,14 +7,14 @@
 | `npm run test:browser` | 隔离 Next.js 夹具的双色、1440/1100/390/320px、抽屉、分页及编辑保留 |
 | `npm run test:content` | 阅读身份、正文边界、渲染与机器输出 |
 | `npm run test:publish` | 发布输入、事务、重放、媒体与 RLS |
-| `npm run test:admin` | 站主身份、支付、邮件、后台操作、导出与失败关闭 |
+| `npm run test:admin` | 站主身份、支付、邮件、后台操作、导出与失败关闭；自定义导航的 RLS、公开投影、乐观保存、两级目录与旧字段迁移（`admin-navigation`） |
 | `npm run test:ai` | 私有 AI 配置、协议／出站保护、完整索引、租约、站主启用及可选诊断 |
 | `npm run test:avatar` | 检索、注入验权、缓存与生成额度 |
 | `npm run test:skills` | 私有包校验、下载和安装授权、文本执行边界、新旧权益与转换 |
 | `npm run test:handbooks` | 专用凭据、发布并发保护、Vault 附件范围与中断恢复 |
 | `npm run plugin:build` / `npm run plugin:check` | 生成受版本控制的 Obsidian 交付包，或验证安装包与源码一致；检查打包模块边界与许可证 |
 | `npm run test:embedding` | 合成向量的协议、顺序、故障、容量、取消与检查工具默认离线；不调用真实供应商 |
-| `npm run test:config` / `test:storage` | 配置组与 Storage 工具 |
+| `npm run test:config` / `test:storage` | 配置组与 Storage 工具；代码栏目登记表、守卫与脚手架（`config-sections`）；不含栏目的公开导出（`config-export-public`） |
 | `npm run release:package` | 只在干净提交打包；插件源码与安装包一致、源码排除项、数据库摘要及输出不可覆盖检查；规则回归纳入 `test:config` |
 | `npm run test:mail:scheduler` / `test:payment:scheduler` | 调度权限与故障处理 |
 | `npm run test:db:media` | 历史媒体精确迁移保护 |
@@ -25,6 +25,10 @@
 `admin-login-recovery.test.ts` 通过隔离依赖执行真实登录 action 和服务端网关，覆盖验证码通过后认领失败的错误传递、公钥误配拒绝及日志脱敏；不发送邮件或使用真实账户。
 
 `ai-sdk.test.ts` 使用锁定 SDK 和合成供应商响应，验证现有四个供应商目标、三种生成协议、流式终止、取消、单次派发、错误脱敏及向量原始响应。`helpers/ai-protocol.ts` 提供标准响应夹具；这些测试不连接供应商，也不证明真实账户可用。SDK 升级必须重跑这些边界测试。
+
+`ai-skill-tool.test.ts` 检查 Skill 唯一原生工具、调用／结果配对、正常 Markdown 回答、非法工具／参数／并行调用拒绝、最后一轮禁用工具、不重发，以及普通生成不能使用工具；`skill-runner.test.ts` 检查包内读取、每个子调用计数、撤权、非法路径，以及 30 轮有界历史和模块切换。所有响应均为合成夹具，不产生供应商费用；真实多轮收敛和最终交付须使用经授权的实际对话验收。
+
+`skill-diagnostics.test.ts` 检查失败参考编号与子调用的精确关联、错误码和状态脱敏、无派发时不声称计费，以及日志异常不能破坏失败处理。测试不读取真实会话或调用账本。
 
 素材库回归在 `test:admin` 中校验原始摘要、图片完整解码、SVG 转换、跨文章登记校验及目录 RLS；浏览器夹具检查选图焦点、草稿保留和 6 MiB 文件直传／响应丢失后的手动恢复。夹具的 Storage 响应为替身，不等同真实云端对象权限通过。
 

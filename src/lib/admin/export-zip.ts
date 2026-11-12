@@ -1,5 +1,6 @@
 /** 极简 store-only（不压缩）ZIP 构建器。纯函数、无依赖，供 tsx 单测直接导入。 */
 import { Buffer } from "node:buffer";
+import { csvCell, csvLine } from "./csv";
 
 const CRC_TABLE = (() => {
   const table = new Uint32Array(256);
@@ -93,14 +94,14 @@ export function buildZip(entries: ZipEntry[], date = new Date()): Uint8Array {
   return out;
 }
 
-/** CSV 转义（与 roster/users 同一约定）。 */
+/** CSV 转义（与 roster/users 同一约定，含公式注入防护）。 */
 export function csvEscape(v: string): string {
-  return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  return csvCell(v);
 }
 
 /** 由表头与行构建 CSV。 */
 export function buildCsv(header: string[], rows: (string | number | null)[][]): string {
   const lines = [header.join(",")];
-  for (const row of rows) lines.push(row.map((v) => csvEscape(v === null ? "" : String(v))).join(","));
+  for (const row of rows) lines.push(csvLine(row));
   return lines.join("\n") + "\n";
 }

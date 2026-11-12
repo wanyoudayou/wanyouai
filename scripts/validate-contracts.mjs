@@ -8,6 +8,7 @@ const jsonFiles = [
   "docs/card.schema.json",
   "docs/contracts/publish-frontmatter.schema.json",
   "docs/contracts/site-config.schema.json",
+  "docs/contracts/section-manifest.schema.json",
 ];
 
 for (const file of jsonFiles) {

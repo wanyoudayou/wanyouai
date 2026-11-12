@@ -19,11 +19,12 @@ export function HeroAskBox({
   const [draft, setDraft] = useState("");
   const { ask, available } = useRightPanel();
 
-  const submit = () => {
+  const submit = async () => {
     const question = draft.trim();
     if (!question) return;
-    ask(question);
+    if (!(await ask(question))) return;
     setDraft("");
+    window.dispatchEvent(new Event("wanyou:open-reading-panel"));
   };
 
   if (!available) return null;
@@ -40,6 +41,7 @@ export function HeroAskBox({
         onChange={(event) => setDraft(event.target.value)}
         placeholder={placeholder}
         aria-label="向站主的分身提问"
+        maxLength={2000}
         className="opc-hero__input h-11 rounded-full bg-background/65 px-4 text-foreground placeholder:text-muted-foreground"
       />
       <Button

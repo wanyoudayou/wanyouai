@@ -1,6 +1,5 @@
 import { generationReady } from "@/lib/ai/settings";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
-import { AdminTabs } from "@/components/admin/admin-tabs";
 import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/session";
 import { getSiteConfig } from "@/lib/get-site-config";
@@ -23,9 +22,8 @@ export default async function SettingsPage() {
   if (error || !data) throw new Error("站点配置暂时不可用");
   const aiReady = await generationReady(createSupabaseServiceClient());
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-6 py-10">
-      <h1 className="text-2xl font-medium">站点配置</h1>
-      <AdminTabs active="settings" />
+    <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+      <h1 className="text-2xl font-semibold">站点配置</h1>
       <SettingsForm
         site={await getSiteConfig(true)}
         updated={data.updated_at}

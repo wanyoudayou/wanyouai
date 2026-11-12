@@ -111,7 +111,7 @@ test("workbench retains collection context and protects an unsaved draft", async
   page,
 }) => {
   await page.goto("/admin/content");
-  await expect(page.getByLabel("所属专辑")).toHaveValue("example");
+  await expect(page.getByLabel("所属手册或活动")).toHaveValue("example");
   await page.getByLabel("标题", { exact: true }).fill("未保存的标题");
   page.once("dialog", (dialog) => dialog.dismiss());
   await page.getByRole("link", { name: "文章", exact: true }).click();
@@ -180,14 +180,15 @@ test("mobile directory uses the same pill and preserves the preference when reop
   await page.getByRole("button", { name: "目录", exact: true }).click();
   const directory = page.getByRole("dialog");
   const appearance = directory.getByRole("button", { name: /^外观：/ });
-  await expect(appearance).toHaveText("跟随系统");
+  // 前台侧栏使用仅图标的紧凑按钮，当前偏好由可访问名称与 data-theme-mode 表达。
+  await expect(appearance).toHaveAttribute("data-theme-mode", "system");
   await appearance.click();
   await appearance.click();
-  await expect(appearance).toHaveText("深色模式");
+  await expect(appearance).toHaveAccessibleName(/^外观：深色模式/);
   await expect(directory).toBeVisible();
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "目录", exact: true }).click();
-  await expect(directory.getByRole("button", { name: /^外观：/ })).toHaveText("深色模式");
+  await expect(directory.getByRole("button", { name: /^外观：/ })).toHaveAttribute("data-theme-mode", "dark");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
@@ -203,7 +204,7 @@ test("SSR colors follow a dark system before JavaScript runs", async ({
     await page.goto("/");
     await expect(page.locator("body")).toHaveCSS(
       "background-color",
-      "rgb(10, 15, 10)",
+      "rgb(14, 12, 24)",
     );
   } finally {
     await context.close();

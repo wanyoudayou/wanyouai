@@ -70,7 +70,7 @@ export function StarterContent({ status }: { status: StarterStatus }) {
         <p className="text-sm">
           示例已导入。可在
           <Link href="/admin/collections" className="text-primary underline">
-            专辑
+            手册
           </Link>
           和
           <Link href="/admin/pages" className="text-primary underline">

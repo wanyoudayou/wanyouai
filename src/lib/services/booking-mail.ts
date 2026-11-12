@@ -10,10 +10,12 @@ type BookingRow = {
 
 async function loadContext(bookingId: number) {
   const service = createSupabaseServiceClient();
-  const [{ data: booking }, { data: site }] = await Promise.all([
+  const [{ data: booking, error: bookingError }, { data: site, error: siteError }] = await Promise.all([
     service.from("bookings").select("id,service_id,email,status,quote_snapshot,delivery_snapshot").eq("id", bookingId).maybeSingle(),
     service.from("site_config").select("site_name").eq("id", 1).maybeSingle(),
   ]);
+  // 读取失败要留下可见记录，否则通知会被静默跳过。
+  if (bookingError || siteError) console.error("[booking-mail] 通知上下文读取失败", bookingId);
   if (!booking) return null;
   const { data: svc } = await service.from("services").select("title").eq("id", booking.service_id).maybeSingle();
   const siteUrl = (process.env.SITE_URL ?? "").replace(/\/$/, "");
@@ -47,7 +49,7 @@ export async function notifyClientQuote(bookingId: number) {
       subject: `【${ctx.siteName}】服务报价：${ctx.serviceTitle}`,
       html: renderMailHtml({
         siteName: ctx.siteName,
-        title: `服务报价 · ${escapeHtml(ctx.serviceTitle)}`,
+        title: `服务报价 · ${ctx.serviceTitle}`,
         bodyHtml: `<p>方案要点：</p><p style="padding:12px;background:#f6f6f6;border-radius:8px;">${escapeHtml(q.plan ?? "")}</p>${q.price != null ? `<p>报价：${escapeHtml(String(q.price))} 元</p>` : ""}${q.delivery_date ? `<p>预计交付：${escapeHtml(q.delivery_date)}</p>` : ""}<p>确认无误请在订单页接受报价；有疑问可直接回复站主。</p>`,
         ctaUrl: ctx.trackingUrl,
         ctaLabel: "查看并接受报价",
@@ -73,7 +75,7 @@ export async function notifyClientDelivery(bookingId: number) {
       subject: `【${ctx.siteName}】服务已交付：${ctx.serviceTitle}`,
       html: renderMailHtml({
         siteName: ctx.siteName,
-        title: `服务已交付 · ${escapeHtml(ctx.serviceTitle)}`,
+        title: `服务已交付 · ${ctx.serviceTitle}`,
         bodyHtml: `<p>交付说明：</p><p style="padding:12px;background:#f6f6f6;border-radius:8px;">${escapeHtml(d.note ?? "")}</p>${links ? `<p>交付链接：</p><ul>${links}</ul>` : ""}<p>请在订单页验收；如需修改可在订单页说明修改意见。</p>`,
         ctaUrl: ctx.trackingUrl,
         ctaLabel: "前往验收",
@@ -99,7 +101,7 @@ export async function notifyOwnerBookingEvent(bookingId: number, label: string) 
       subject: `【${ctx.siteName}】服务订单动态：${ctx.serviceTitle}`,
       html: renderMailHtml({
         siteName: ctx.siteName,
-        title: `订单 #${bookingId} · ${escapeHtml(ctx.serviceTitle)}`,
+        title: `订单 #${bookingId} · ${ctx.serviceTitle}`,
         bodyHtml: `<p>${escapeHtml(label)}</p>`,
         ctaUrl: ctx.adminUrl,
         ctaLabel: "前往订单管理",
@@ -123,7 +125,7 @@ export async function notifyClientAgreementSent(bookingId: number) {
       subject: `【${ctx.siteName}】请确认订单条款：${ctx.serviceTitle}`,
       html: renderMailHtml({
         siteName: ctx.siteName,
-        title: `请确认订单条款 · ${escapeHtml(ctx.serviceTitle)}`,
+        title: `请确认订单条款 · ${ctx.serviceTitle}`,
         bodyHtml: `<p>站主已完善本单的合作条款（范围 / 交付 / 节奏 / 酬劳 / 退出 / 归属），请在订单页查看并确认；如有异议可直接在订单页提出。</p>`,
         ctaUrl: ctx.trackingUrl,
         ctaLabel: "查看并确认条款",
@@ -147,7 +149,7 @@ export async function notifyClientStarted(bookingId: number) {
       subject: `【${ctx.siteName}】订单已开工：${ctx.serviceTitle}`,
       html: renderMailHtml({
         siteName: ctx.siteName,
-        title: `订单已开工 · ${escapeHtml(ctx.serviceTitle)}`,
+        title: `订单已开工 · ${ctx.serviceTitle}`,
         bodyHtml: `<p>条款已确认，站主已开工。你可以在订单页查看里程碑进度；如有需要你配合的检查点，会显示「当前等待你」。</p>`,
         ctaUrl: ctx.trackingUrl,
         ctaLabel: "查看订单进度",
@@ -171,7 +173,7 @@ export async function notifyClientMilestoneRequest(bookingId: number, milestoneT
       subject: `【${ctx.siteName}】订单需要你提供信息：${ctx.serviceTitle}`,
       html: renderMailHtml({
         siteName: ctx.siteName,
-        title: `检查点「${escapeHtml(milestoneTitle)}」需要你的反馈`,
+        title: `检查点「${milestoneTitle}」需要你的反馈`,
         bodyHtml: `<p>站主的请求：</p><p style="padding:12px;background:#f6f6f6;border-radius:8px;">${escapeHtml(note)}</p><p>请在订单页直接回复（文字即可，素材可贴链接）。不着急——这不阻塞订单的其他进展。</p>`,
         ctaUrl: ctx.trackingUrl,
         ctaLabel: "前往反馈",
@@ -195,7 +197,7 @@ export async function notifyClientMilestoneDelivered(bookingId: number, mileston
       subject: `【${ctx.siteName}】节点已交付，请验收：${ctx.serviceTitle}`,
       html: renderMailHtml({
         siteName: ctx.siteName,
-        title: `检查点「${escapeHtml(milestoneTitle)}」已交付`,
+        title: `检查点「${milestoneTitle}」已交付`,
         bodyHtml: `<p>站主已交付该节点的成果，请在订单页查看交付记录并确认验收；如有问题可驳回并注明原因，站主会返工后重新交付。</p>`,
         ctaUrl: ctx.trackingUrl,
         ctaLabel: "前往验收",

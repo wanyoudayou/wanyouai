@@ -19,7 +19,7 @@ const labels: Record<AdminTab, string> = {
   card: "站主名片",
   services: "服务项目",
   orders: "服务履约",
-  settings: "首页与导航",
+  settings: "站点配置",
   setup: "部署检查",
 };
 export function AdminTabs({ active }: { active: AdminTab }) {

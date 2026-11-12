@@ -119,7 +119,7 @@ export function ServiceDetail({
         </dl>
       </section>
 
-      <section className="space-y-3" aria-label="约束">
+      {(constraints.workingHours || constraints.responseTime || constraints.currentLoad || constraints.exclusions.length > 0) && <section className="space-y-3" aria-label="约束">
         <h2 className="text-2xl leading-snug font-medium">约束</h2>
         <dl className="space-y-2 text-sm">
           {constraints.workingHours ? (
@@ -137,7 +137,7 @@ export function ServiceDetail({
             </Definition>
           ) : null}
         </dl>
-      </section>
+      </section>}
 
       {evaluations.length > 0 && (
         <section

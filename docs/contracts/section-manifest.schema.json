@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wanyou.ai/schemas/section-manifest.schema.json",
+  "title": "代码栏目 manifest",
+  "description": "src/sections/<name>/manifest.json。只含公开元数据，由 npm run sections:build 汇总为 src/generated/sections.json。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "title", "description", "icon", "tier", "dependencies", "budgetKb"],
+  "properties": {
+    "name": {
+      "description": "与目录名一致；栏目路径固定为 /lab/<name>。",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,39}$"
+    },
+    "title": { "description": "默认导航名称与页面标题。", "type": "string", "minLength": 1, "maxLength": 40 },
+    "description": { "description": "页面描述与后台说明。", "type": "string", "minLength": 1, "maxLength": 200 },
+    "icon": { "description": "导航图标，取自 src/lib/navigation/icons.ts 白名单。", "type": "string", "pattern": "^[a-z][a-z0-9-]{0,39}$" },
+    "tier": { "description": "standard 只用主站资源；extended 可登记栏目 token 与独占依赖。", "enum": ["standard", "extended"] },
+    "dependencies": {
+      "description": "本栏目独占的 npm 包（仅 extended）。须写入根 package.json dependencies，且只能在本栏目内导入。",
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 10,
+      "items": { "type": "string", "pattern": "^(@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$" }
+    },
+    "budgetKb": { "description": "栏目路由首屏客户端 JS 增量上限（KB，gzip）。", "type": "integer", "minimum": 10, "maximum": 500 }
+  },
+  "examples": [
+    {
+      "name": "git-flow-lab",
+      "title": "Git 流程实验室",
+      "description": "在浏览器中练习分支、提交与合并流程。",
+      "icon": "git-branch",
+      "tier": "standard",
+      "dependencies": [],
+      "budgetKb": 120
+    }
+  ]
+}

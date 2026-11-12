@@ -1236,9 +1236,9 @@ test(
   "avatar quota: station cap spans users; a replay dispatches at most once",
   { timeout: 15000 },
   async () => {
-    const users = await Promise.all(
-      Array.from({ length: 6 }, () => fixture("single")),
-    );
+    // Fixtures share the observer connection; create them sequentially (pg@9 forbids overlapping queries on one client).
+    const users = [];
+    for (let i = 0; i < 6; i++) users.push(await fixture("single"));
     const used = (
       await observer.query(
         "select count(*)::int n from avatar_usage where created_at>=date_trunc('month',now() at time zone 'UTC') at time zone 'UTC' and generation_state<>'released' and (generation_state<>'reserved' or reservation_expires_at>now())",
@@ -1519,4 +1519,38 @@ test("whole-series duplicate publication races return one atomic result and one 
   const count=(await observer.query("select count(*)::int count from article_versions where article_id in(select id from articles where series_id=$1)",[s.id])).rows[0].count;
   assert.equal(count,2);
   assert.equal((await observer.query("select status from series where id=$1",[s.id])).rows[0].status,"published");
+});
+
+test("event registration: eight members racing for the last free seat admit exactly one", { timeout: 15000 }, async () => {
+  const series = (await observer.query("insert into series(slug,type,title,price,status) values($1,'event','Seat race',0,'published') returning id", [`seat-${randomUUID()}`])).rows[0].id;
+  await observer.query("insert into event_details(series_id,state,ticket_price,kind,capacity,starts_at) values($1,'registering',0,'open','1',now()+interval '1 day')", [series]);
+  const users = Array.from({ length: 8 }, () => randomUUID());
+  for (const user of users) await observer.query("insert into auth.users(id,email) values($1,$2)", [user, `${user}@example.test`]);
+  const clients = await Promise.all(users.map(() => connect("authenticated")));
+  for (const [i, client] of clients.entries()) await client.query("select set_config('request.jwt.claims',$1,false)", [JSON.stringify({ sub: users[i] })]);
+  await blocker.query("begin");
+  await blocker.query("select 1 from event_details where series_id=$1 for update", [series]);
+  const results = clients.map((client) => outcome(client.query("select register_for_event($1) result", [series])));
+  try { await waitForLocks(clients); } finally { await blocker.query("commit"); }
+  try {
+    const settled = await Promise.all(results);
+    assert(settled.every((r) => !r.error), "registration must not raise");
+    assert.equal(settled.filter((r) => r.value.ok).length, 1);
+    assert.equal(settled.filter((r) => r.value.code === "FULL").length, 7);
+    assert.equal((await observer.query("select count(*)::int n from registrations where series_id=$1 and status='registered'", [series])).rows[0].n, 1);
+  } finally {
+    await Promise.all(clients.map(async (client) => { await client.end(); sessions.delete(client); }));
+  }
+});
+
+test("request limits: eight concurrent submissions on one bucket admit exactly the daily limit", { timeout: 15000 }, async () => {
+  const bucket = `ip:${randomUUID()}`;
+  const results = await compete("request-limit-race", Array.from({ length: 8 }, () => ({
+    text: "select pg_advisory_xact_lock(hashtextextended('request-limit-race',0)), consume_request_limit($1,current_date,3) result",
+    values: [bucket],
+  })));
+  assert(results.every((r) => !r.error));
+  assert.equal(results.filter((r) => r.value === true).length, 3);
+  assert.equal(results.filter((r) => r.value === false).length, 5);
+  assert.equal((await observer.query("select used from request_limits where bucket=$1", [bucket])).rows[0].used, 3);
 });

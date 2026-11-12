@@ -13,7 +13,7 @@ export function ConversationBody({ children, scrollKey }: { children: ReactNode;
     const viewport = scrollRef.current?.querySelector<HTMLElement>("[data-slot=scroll-area-viewport]");
     viewport?.scrollTo({ top: viewport.scrollHeight });
   }, [scrollKey]);
-  return <ScrollArea ref={scrollRef} className="min-h-0 min-w-0 flex-1"><div className="flex min-w-0 flex-col gap-3 p-4">{children}</div></ScrollArea>;
+  return <ScrollArea ref={scrollRef} className="min-h-0 min-w-0 flex-1"><div role="log" aria-live="polite" aria-label="对话记录" className="flex min-w-0 flex-col gap-3 p-4">{children}</div></ScrollArea>;
 }
 
 export function ConversationBubble({ user = false, children }: { user?: boolean; children: ReactNode }) {
@@ -22,9 +22,16 @@ export function ConversationBubble({ user = false, children }: { user?: boolean;
   </div>;
 }
 
-export function ConversationComposer({ value, onChange, onSubmit, disabled, sendDisabled, label, placeholder, maxLength }: {
+export type ComposerCombobox = {
+  expanded: boolean; listId: string; activeId?: string;
+  /** 返回 true 表示按键已由候选列表处理（方向键、回车选中、Esc 关闭）。 */
+  onKey: (event: React.KeyboardEvent<HTMLTextAreaElement>) => boolean;
+};
+
+export function ConversationComposer({ value, onChange, onSubmit, disabled, sendDisabled, label, placeholder, maxLength, combobox }: {
   value: string; onChange: (value: string) => void; onSubmit: () => void;
   disabled: boolean; sendDisabled?: boolean; label: string; placeholder: string; maxLength: number;
+  combobox?: ComposerCombobox;
 }) {
   const draftRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
@@ -36,8 +43,10 @@ export function ConversationComposer({ value, onChange, onSubmit, disabled, send
   const submit = () => { if (!disabled && !sendDisabled && value.trim()) onSubmit(); };
   return <div className="relative">
     <textarea ref={draftRef} value={value} onChange={event => onChange(event.target.value)} onKeyDown={event => {
+      if (!event.nativeEvent.isComposing && combobox?.onKey(event)) return;
       if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); submit(); }
     }} rows={2} placeholder={placeholder} aria-label={label} maxLength={maxLength} disabled={disabled}
+      {...(combobox?.expanded ? { role: "combobox", "aria-autocomplete": "list" as const, "aria-expanded": true, "aria-controls": combobox.listId, "aria-activedescendant": combobox.activeId } : {})}
       className="block max-h-40 min-h-18 w-full resize-none rounded-2xl border bg-muted/40 py-2.5 pr-12 pl-3 text-sm leading-[1.7] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50" />
     <Button type="button" size="icon" className="absolute right-2 bottom-2 rounded-full" onClick={submit} disabled={disabled || sendDisabled || !value.trim()} aria-label="发送"><SendHorizontalIcon /></Button>
   </div>;

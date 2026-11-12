@@ -72,3 +72,17 @@ test('页面选择器死引用按未配置降级（防死链）', () => {
   assert.deepEqual(filterStalePageRef({ email: 'a@b.c' }, 'booking_page', published), { email: 'a@b.c' });
   assert.equal(filterStalePageRef(null, 'booking_page', published), null);
 });
+
+test("custom page links: named targets are dropped and new windows lose opener", async () => {
+  const { sanitizeCustomHtml } = await import("../src/lib/custom-pages/sanitize");
+  assert.equal(sanitizeCustomHtml('<a href="https://x.test" target="win">a</a>'), '<a href="https://x.test">a</a>');
+  assert.equal(sanitizeCustomHtml('<a href="https://x.test" target="_blank" rel="opener">a</a>'), '<a href="https://x.test" target="_blank" rel="noopener noreferrer">a</a>');
+  assert.equal(sanitizeCustomHtml('<a href="/p/x" target="_self">a</a>'), '<a href="/p/x" target="_self">a</a>');
+});
+
+test("legacy contact links accept only same-site paths or https", () => {
+  for (const bad of ["javascript:alert(1)", "//evil.test/x", "/\\evil.test", "http://plain.test"])
+    assert.equal(normalizeContactConfig({ booking_url: bad }).bookingUrl, null, bad);
+  assert.equal(normalizeContactConfig({ booking_url: "https://cal.test/me" }).bookingUrl, "https://cal.test/me");
+  assert.equal(normalizeContactConfig({ booking_url: "/p/contact" }).bookingUrl, "/p/contact");
+});

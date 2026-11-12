@@ -3,6 +3,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { outboxConfig, runMailOutbox } from "@/lib/payments/mail-outbox";
 import { mailOutboxGateway } from "@/lib/payments/mail-outbox-server";
 import { sendMailSchedulerHeartbeat } from "@/lib/mail-scheduler-heartbeat";
+import { getSiteConfig } from "@/lib/get-site-config";
 
 export const maxDuration = 60;
 
@@ -11,7 +12,8 @@ export async function POST(request: Request) {
     return Response.json({ message: "未授权" }, { status: 401, headers: { "Cache-Control": "no-store" } });
   const signal = AbortSignal.timeout(45000);
   try {
-    const config = outboxConfig(process.env);
+    const base = outboxConfig(process.env);
+    const config = base ? { ...base, timeZone: (await getSiteConfig()).identity.timezone } : null;
     if (!config) return Response.json({ message: "事务邮件配置未就绪" }, { status: 503, headers: { "Cache-Control": "no-store" } });
     const service = createSupabaseServiceClient({ timeoutMs: 8000, signal });
     const result = await runMailOutbox(mailOutboxGateway(service), config, { signal });

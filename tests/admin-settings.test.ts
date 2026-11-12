@@ -29,6 +29,11 @@ test("subscription can be unconfigured while other paid products remain availabl
   }
   form.set("amount", "99"); form.set("currency", "CNY");
   assert.equal(parseSiteSettings(form).commerce.subscription_price?.amount, 99);
+  // zpay 只按人民币结算：开通在线收款时拒绝其他展示币种，关闭后可用于纯展示。
+  form.set("currency", "USD");
+  assert.throws(() => parseSiteSettings(form), /人民币/);
+  form.delete("payment_enabled");
+  assert.equal(parseSiteSettings(form).commerce.subscription_price?.currency, "USD");
 });
 
 test("card settings: contact anyOf, IANA timezone, booking page slug", () => {

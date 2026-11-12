@@ -14,7 +14,7 @@ export async function savePageAction(
   const placement = String(form.get("placement") ?? "none");
   if (
     !["draft", "published", "archived"].includes(status) ||
-    !["nav", "footer", "none"].includes(placement)
+    !["footer", "none"].includes(placement)
   )
     return { ok: false, message: "状态或发布位置无效。" };
   try {
@@ -28,7 +28,7 @@ export async function savePageAction(
         status: status as "draft" | "published" | "archived",
         nav_label: String(form.get("nav_label") ?? "") || null,
         nav_order: Number(form.get("nav_order")) || 0,
-        placement: placement as "nav" | "footer" | "none",
+        placement: placement as "footer" | "none",
       },
       String(form.get("updated_at") ?? "") || undefined,
     );

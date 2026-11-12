@@ -21,7 +21,7 @@
   gap: 13px;
   padding: 22px;
   border: var(--opc-card-stroke) solid var(--opc-card-border);
-  border-radius: 18px;
+  border-radius: var(--opc-card-radius);
   background: var(--opc-card-fallback);
   color: var(--card-foreground);
 }
@@ -220,7 +220,7 @@
   margin-top: 24px;
   padding: 22px;
   border: 1.5px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--opc-card-radius);
   background: var(--opc-panel);
 }
 

@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useActionState } from "react";
@@ -24,8 +25,7 @@ const STATUS_TONE: Record<string, "free" | "owned" | "paused"> = {
   archived: "paused",
 };
 const PLACEMENT_LABEL: Record<string, string> = {
-  nav: "左侧栏",
-  footer: "底部",
+  footer: "页脚",
   none: "不固定",
 };
 
@@ -138,11 +138,16 @@ export function PageEditor({
   useEffect(() => {
     if (mode !== "preview" || !previewStale) return;
     let stale = false;
+    // 失败（含会话过期）也要结束“更新中”状态并提示，不能让预览永远停在加载中。
     previewPageHtml(html).then((result) => {
-      if (!stale && result.ok) {
-        setPreview(result.html);
-        setPreviewStale(false);
-      }
+      if (stale) return;
+      if (result.ok) setPreview(result.html);
+      else setAiMessage("预览暂时不可用，请确认登录状态后重试；编辑内容已保留。");
+      setPreviewStale(false);
+    }).catch(() => {
+      if (stale) return;
+      setAiMessage("预览暂时不可用，请稍后重试；编辑内容已保留。");
+      setPreviewStale(false);
     });
     return () => {
       stale = true;
@@ -285,7 +290,7 @@ export function PageEditor({
             </select>
           </label>
           <label className="space-y-1 text-sm">
-            发布位置
+            页脚链接
             <select
               name="placement"
               defaultValue={page?.placement ?? "none"}
@@ -299,7 +304,7 @@ export function PageEditor({
             </select>
           </label>
           <label className="space-y-1 text-sm">
-            显示名称（左栏/页脚链接文字；留空用页面标题）
+            页脚链接文字（留空用页面标题）
             <Input
               name="nav_label"
               defaultValue={page?.nav_label ?? ""}
@@ -307,13 +312,20 @@ export function PageEditor({
             />
           </label>
           <label className="space-y-1 text-sm">
-            导航排序号（越小越靠前）
+            页脚排序号（越小越靠前）
             <Input
               name="nav_order"
               type="number"
               defaultValue={page?.nav_order ?? 0}
             />
           </label>
+          <p className="text-sm text-muted-foreground sm:col-span-2">
+            加入左侧栏：发布后前往{" "}
+            <Link href="/admin/navigation" className="text-primary underline-offset-4 hover:underline">
+              导航管理
+            </Link>
+            添加本页面。
+          </p>
         </div>
 
         {mode === "edit" && (
@@ -322,6 +334,7 @@ export function PageEditor({
             onSelect={(asset) => {
               setHtml((value) => value + "\n" + assetImageHtml(asset));
               setPreviewStale(true);
+              setDirty(true);
             }}
           />
         )}

@@ -51,8 +51,19 @@ select version from public.app_schema_version where id = 1;
 | `20261024020015` | [手册同步权限与事务](../../supabase/migrations/20261024072558_handbook_sync_authority.sql) | `20261024072558` |
 | `20261024072558` | [兼容转换与私有交付](../../supabase/migrations/20261024131326_skill_compatibility_and_delivery.sql) | `20261024131326` |
 | `20261024131326` | [专辑设置与全辑发布事务](../../supabase/migrations/20261026184628_series_review_workflow.sql) | `20261026184628` |
+| `20261026184628` | [活动报名权威与名额](../../supabase/migrations/20261111000000_event_registration_authority.sql) | `20261111000000` |
+| `20261111000000` | [公开提交限频与询价事务](../../supabase/migrations/20261111000100_request_limits.sql) | `20261111000100` |
+| `20261111000100` | [评价、公开评价与核销查询](../../supabase/migrations/20261111000200_user_scoped_authorities.sql) | `20261111000200` |
+| `20261111000200` | [自定义导航表与旧导航字段迁移](../../supabase/migrations/20261111120000_navigation_items.sql) | `20261111120000` |
+| `20261111120000` | [两级导航目录](../../supabase/migrations/20261112090000_navigation_groups.sql) | `20261112090000` |
 
 若实例已经停在中间版本 `20261011115340`，只补执行[商户编号结算校验](../../supabase/migrations/20261011144257_enforce_payment_reference_at_settlement.sql)，再继续表中的查单任务升级；不重复执行组合脚本。表中版本是脚本的适用条件，后续目标以发布清单为准。
+
+### 自定义导航升级
+
+`20261111120000` 新建 `nav_items`，把已勾选“加入侧栏”的专辑和发布位置为“左侧栏”的页面按原名称与顺序复制进去；页面的页脚设置不变。迁移不改动已有数据：专辑的 `nav_enabled` / `nav_label` / `nav_order` 与页面的 `placement = nav` 原样保留，新应用不再读取或写入它们，回滚到旧应用时旧导航继续生效。先在副本执行并运行 `verify.sql`，再在正式库执行，然后部署配套应用；迁移后到新应用上线之前，旧应用照常工作。不要先部署新应用再执行迁移：新应用的专辑设置保存依赖新的数据库函数。
+
+`20261112090000` 为 `nav_items` 增加 `parent_id` 与父级目录类型 `group`，并更新 `public_navigation()` 与 `save_nav_items`。已有导航项保持顶层、内容不变；旧应用在迁移后照常工作（不显示目录）。同样先执行迁移再部署配套应用：新应用读取的 `parent_id` 和保存目录依赖新函数。
 
 ### 分身配额升级
 

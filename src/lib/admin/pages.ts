@@ -23,7 +23,13 @@ export async function listCustomPages(): Promise<
       .order("id")
       .range(offset, offset + 499);
     if (error) throw new Error("页面选项暂时不可用");
-    rows.push(...(data as Omit<CustomPageRow, "html">[]));
+    // 旧版的 placement='nav' 已迁入 nav_items，这里按“不固定”呈现。
+    rows.push(
+      ...(data as Omit<CustomPageRow, "html">[]).map((row) => ({
+        ...row,
+        placement: row.placement === "footer" ? ("footer" as const) : ("none" as const),
+      })),
+    );
     if (data.length < 500) return rows;
   }
 }
@@ -37,7 +43,7 @@ export interface CustomPageInput {
   status: "draft" | "published" | "archived";
   nav_label: string | null;
   nav_order: number;
-  placement: "nav" | "footer" | "none";
+  placement: "footer" | "none";
 }
 
 /** 保存（新建/更新）自定义页：html 保存时净化；updated_at 乐观锁防并发覆盖。 */
@@ -62,9 +68,9 @@ export async function saveCustomPage(
     updated_at: new Date().toISOString(),
   };
   if (input.id) {
-    let query = client.from("custom_pages").update(row).eq("id", input.id);
-    if (expectedUpdatedAt) query = query.eq("updated_at", expectedUpdatedAt);
-    const { data, error } = await query.select("id");
+    // 更新必须带乐观锁版本，否则并发编辑会被静默覆盖。
+    if (!expectedUpdatedAt) throw new Error("页面版本缺失，请刷新后重试。");
+    const { data, error } = await client.from("custom_pages").update(row).eq("id", input.id).eq("updated_at", expectedUpdatedAt).select("id");
     if (error)
       throw new Error(
         error.code === "23505"
@@ -85,6 +91,7 @@ export async function saveCustomPage(
         ? "此网址标识已被占用。"
         : "创建失败，请稍后重试。",
     );
+  if (!data?.length) throw new Error("创建失败，请稍后重试。");
   return { id: data[0].id as number };
 }
 

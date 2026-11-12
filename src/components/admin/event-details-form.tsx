@@ -32,7 +32,7 @@ export function EventDetailsForm({ id, updated, details }: { id: number; updated
         <span className="block text-xs text-muted-foreground">按你电脑的本地时间选择，保存时自动转换为标准时间。</span>
       </label>
       <label className="space-y-1 text-sm">地点<Input name="location_text" maxLength={500} defaultValue={details?.location_text ?? ""} /></label>
-      <label className="space-y-1 text-sm">报名说明<textarea name="registration" maxLength={3000} defaultValue={details?.registration ?? ""} className="block min-h-24 w-full rounded-md border bg-background p-2" /><span className="block text-xs text-muted-foreground">公开展示的说明，报名与支付尚未开通。</span></label>
+      <label className="space-y-1 text-sm">报名说明<textarea name="registration" maxLength={3000} defaultValue={details?.registration ?? ""} className="block min-h-24 w-full rounded-md border bg-background p-2" /><span className="block text-xs text-muted-foreground">公开展示的报名说明；报名、购票与名额由活动状态和票价控制。</span></label>
       <label className="space-y-1 text-sm">名额说明<Input name="capacity" maxLength={200} defaultValue={details?.capacity ?? ""} /></label>
       <label className="space-y-1 text-sm">票价（元）<Input name="ticket_price" required type="number" min="0" max="999999.99" step="0.01" defaultValue={details?.ticket_price ?? 0} /></label>
       <label className="space-y-1 text-sm">活动类型<select name="kind" defaultValue={details?.kind ?? "open"} className="block w-full rounded-md border bg-background p-2"><option value="open">开放活动</option><option value="member">会员活动</option></select></label>

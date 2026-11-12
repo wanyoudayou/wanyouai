@@ -12,7 +12,7 @@ Vercel 的 `git.deploymentEnabled` 对 `ci/**` 设置为 false，这类分支用
 
 | 作业 | 环境及内容 | 截止 |
 |---|---|---|
-| verify | Ubuntu 24.04、Node 22、npm ci；契约、配置、Storage、干净库、媒体迁移、安装工件、内容 / 发布 / 后台 / 分身及离线 Embedding 测试、lint、类型检查、生产构建 | 15 分钟 |
+| verify | Ubuntu 24.04、Node 22、npm ci；契约、配置、Storage、干净库、媒体迁移、安装工件、内容 / 发布 / 后台 / 分身及离线 Embedding 测试、lint、类型检查、生产构建、代码栏目体积 | 15 分钟 |
 | browser | Ubuntu 24.04、Node 22、Chromium；隔离 UI 夹具中的双色、响应式、分页与编辑恢复 | 15 分钟 |
 | database-concurrency | Ubuntu 24.04、Node 22、固定摘要的 PostgreSQL 17 / pgvector 容器；完整安装、真实独立连接竞争、事务故障与恢复 | 10 分钟 |
 

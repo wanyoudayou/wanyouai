@@ -16,6 +16,8 @@
 
 这些是持续维护工具，保留版本控制。生成的升级审查材料、性能结果、下载包与临时日志存入 `.local-archive/`，不提交真实密钥或业务资料。
 
+在私有仓库维护代码栏目时，`node scripts/export-public.mjs <目标目录>` 从已提交版本导出不含栏目及其独占依赖的公开副本，并在残留引用时失败；规则见[自定义导航与代码栏目](../docs/development/custom-sections.md#私有栏目与公开版本)。
+
 设计规范维护 `src/styles/tokens.json`，运行 `tokens:build` 生成 CSS。默认手册由 `content/starter/manifest.json` 选择公开来源与部署指南章节，运行 `starter:build` 生成正文及站内章节链接；[来源说明](../content/starter/README.md)列出八篇内容的维护位置。contracts 检查生成文件无漂移，同时验证升级表从基线连续到达目标结构版本。浏览器测试使用独立夹具，详见测试说明。
 
 `npm run embedding:check` 默认只显示说明。显式添加 `-- --live` 才在交互终端要求输入不回显的硅基流动 Key，检查 `BAAI/bge-m3` 原生 1024 维：最多一次模型列表与两次向量请求、7 条合成文本，可能计费；不读取环境文件或实际文章、不写数据库、不调用生成模型。接入与结果边界见 [Embedding 实施规格](../docs/development/embedding-implementation.md)。

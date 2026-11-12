@@ -72,7 +72,10 @@ export function gateHits(
     const level = visible(reader, article, series);
     if (level === "hidden") continue;
     const url = articleUrl(article, series);
-    if (["catalog", "readme", "preview"].includes(hit.chunk_type)) {
+    // README 只有在确为本专辑公开 README 时才当作公开样品；否则按正文走权限分级（纵深防御）。
+    const publicReadme = hit.chunk_type === "readme" && !!series && series.readme_article_id === article.id && article.access === "public";
+    const chunkType = hit.chunk_type === "readme" && !publicReadme ? "body" : hit.chunk_type;
+    if (["catalog", "readme", "preview"].includes(chunkType)) {
       out.push({
         articleId: article.id,
         title: article.title,
@@ -84,7 +87,7 @@ export function gateHits(
       });
       continue;
     }
-    if (hit.chunk_type !== "body") continue;
+    if (chunkType !== "body") continue;
     if (level === "full") {
       out.push({
         articleId: article.id,

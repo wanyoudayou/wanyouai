@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { createElement, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
+  ArrowUpRightIcon,
   BookOpenIcon,
-  FileTextIcon,
   BriefcaseIcon,
   CalendarDaysIcon,
+  ChevronDownIcon,
   HomeIcon,
   IdCardIcon,
   LayoutDashboardIcon,
@@ -22,6 +24,9 @@ import { SiteLogo } from "@/components/shared/site-logo";
 import { SubscribePill } from "@/components/shell/subscribe-pill";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { cn } from "@/lib/utils";
+import { activeHref } from "@/lib/navigation/match";
+import { navIcon } from "@/lib/navigation/icons";
+import { navLinks, type NavEntry, type NavGroup, type NavLink } from "@/lib/navigation/types";
 
 export const NAV_ITEMS = [
   { href: "/", label: "首页", Icon: HomeIcon },
@@ -40,7 +45,7 @@ export interface LeftNavProps {
   siteName: string;
   tagline: string | null;
   logoUrl: string | null;
-  navPages?: { href: string; label: string }[];
+  navItems?: NavEntry[];
   subscribe: {
     enabled: boolean;
     priceText: string | null;
@@ -49,9 +54,102 @@ export interface LeftNavProps {
   };
 }
 
-function isActive(pathname: string, href: string): boolean {
-  if (href === "/") return pathname === "/";
-  return pathname === href || pathname.startsWith(`${href}/`);
+/** 内置与自定义导航（含目录子项）共同参与最长前缀匹配；外链不参与。 */
+export function navActiveHref(pathname: string, navItems: readonly NavEntry[]) {
+  return activeHref(pathname, [
+    ...NAV_ITEMS.map((item) => item.href),
+    ...navLinks(navItems).filter((item) => !item.external).map((item) => item.href),
+  ]);
+}
+
+/** 自定义导航链接：站内链接参与激活，外链新窗口打开并带外链标记。 */
+function CustomNavLink({
+  link,
+  active,
+  nested = false,
+  onNavigate,
+}: {
+  link: NavLink;
+  active: boolean;
+  nested?: boolean;
+  onNavigate?: () => void;
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      asChild
+      className={cn(
+        "justify-start",
+        nested && "pl-9",
+        link.kind === "section" && "max-md:hidden",
+        active && "bg-accent font-medium text-accent-foreground",
+      )}
+    >
+      {link.external ? (
+        <a href={link.href} target="_blank" rel="noopener noreferrer" onClick={onNavigate}>
+          {createElement(navIcon(link.icon))}
+          <span className="min-w-0 flex-1 truncate">{link.label}</span>
+          <ArrowUpRightIcon className="text-muted-foreground" aria-label="（外部链接）" />
+        </a>
+      ) : (
+        <Link href={link.href} onClick={onNavigate} aria-current={active ? "page" : undefined}>
+          {createElement(navIcon(link.icon))}
+          <span className="min-w-0 truncate">{link.label}</span>
+        </Link>
+      )}
+    </Button>
+  );
+}
+
+/** 父级目录：本身不是链接，右侧向下箭头展开或收起子项（只有一层）。 */
+function CustomNavGroup({
+  group,
+  current,
+  open,
+  onToggle,
+  onNavigate,
+}: {
+  group: NavGroup;
+  current: string | null;
+  open: boolean;
+  onToggle: () => void;
+  onNavigate?: () => void;
+}) {
+  const panel = `nav-${group.key}`;
+  const contains = group.children.some((child) => !child.external && child.href === current);
+  const onlySections = group.children.every((child) => child.kind === "section");
+  return (
+    <div className={cn("flex flex-col gap-1", onlySections && "max-md:hidden")}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        aria-expanded={open}
+        aria-controls={panel}
+        onClick={onToggle}
+        className={cn("justify-start", contains && !open && "font-medium text-accent-foreground")}
+      >
+        {createElement(navIcon(group.icon))}
+        <span className="min-w-0 flex-1 truncate text-left">{group.label}</span>
+        <ChevronDownIcon
+          aria-hidden
+          className={cn("text-muted-foreground transition-transform motion-reduce:transition-none", open && "rotate-180")}
+        />
+      </Button>
+      <div id={panel} role="group" aria-label={group.label} hidden={!open} className="flex flex-col gap-1">
+        {group.children.map((child) => (
+          <CustomNavLink
+            key={child.href}
+            link={child}
+            nested
+            active={!child.external && current === child.href}
+            onNavigate={onNavigate}
+          />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 /** 左栏内容：桌面常显与移动端抽屉共用一份（页面契约 2.1）。 */
@@ -59,7 +157,7 @@ export function LeftNavContent({
   siteName,
   tagline,
   logoUrl,
-  navPages = [],
+  navItems = [],
   subscribe,
   onNavigate,
   owner = false,
@@ -67,6 +165,10 @@ export function LeftNavContent({
 }: LeftNavProps) {
   const pathname = usePathname();
   const reading = useReadingShell();
+  const current = navActiveHref(pathname, navItems);
+  const hasSections = navLinks(navItems).some((item) => item.kind === "section");
+  // 未手动切换的目录：包含当前页面时展开，其余收起。
+  const [toggled, setToggled] = useState<Record<string, boolean>>({});
 
   return (
     <div className="flex h-full flex-col">
@@ -90,7 +192,7 @@ export function LeftNavContent({
           aria-label="内容地图"
         >
           {NAV_ITEMS.map(({ href, label, Icon }) => {
-            const active = isActive(pathname, href);
+            const active = current === href;
             return (
               <Button
                 key={href}
@@ -113,31 +215,36 @@ export function LeftNavContent({
               </Button>
             );
           })}
-          {/* 自定义页（published + 配了导航名），排在内置项之后 */}
-          {navPages.map(({ href, label }) => {
-            const active = isActive(pathname, href);
-            return (
-              <Button
-                key={href}
-                variant="ghost"
-                size="sm"
-                asChild
-                className={cn(
-                  "justify-start",
-                  active && "bg-accent font-medium text-accent-foreground",
-                )}
-              >
-                <Link
-                  href={href}
-                  onClick={onNavigate}
-                  aria-current={active ? "page" : undefined}
-                >
-                  <FileTextIcon />
-                  {label}
-                </Link>
-              </Button>
-            );
-          })}
+          {/* 自定义导航（后台「导航」管理），排在内置项之后；代码栏目面向电脑端 */}
+          {navItems.map((entry) =>
+            entry.kind === "group" ? (
+              <CustomNavGroup
+                key={entry.key}
+                group={entry}
+                current={current}
+                open={toggled[entry.key] ?? entry.children.some((child) => !child.external && child.href === current)}
+                onToggle={() =>
+                  setToggled((previous) => ({
+                    ...previous,
+                    [entry.key]: !(previous[entry.key] ?? entry.children.some((child) => !child.external && child.href === current)),
+                  }))
+                }
+                onNavigate={onNavigate}
+              />
+            ) : (
+              <CustomNavLink
+                key={entry.href}
+                link={entry}
+                active={!entry.external && current === entry.href}
+                onNavigate={onNavigate}
+              />
+            ),
+          )}
+          {hasSections && (
+            <p className="px-3 pt-2 text-xs text-muted-foreground md:hidden">
+              更多栏目请在电脑上访问。
+            </p>
+          )}
         </nav>
       )}
       {/* 站主登录时，后台区段统一入口「网站管理」（/admin 内再分区段；工作台入口在后台首页） */}
@@ -167,35 +274,35 @@ export function LeftNavContent({
       <Separator />
       {/* 底部身份区（页面契约 2.4）：匿名 = 登录 + 订阅 pill；登录 = 邮箱入口 /me；站主保留后台入口。 */}
       <div className="flex flex-col gap-3 p-4">
-        <ThemeToggle />
         <SubscribePill
           enabled={subscribe.enabled}
           priceText={subscribe.priceText}
           href={subscribe.href}
           subscribedDays={subscribe.subscribedDays}
         />
-        {user ? (
-          <Link
-            href="/me"
-            onClick={onNavigate}
-            aria-label={`我的权益（${user.email}）`}
-            title={user.email}
-            className="flex items-center gap-2 self-start text-xs text-muted-foreground underline-offset-4 hover:text-foreground"
-          >
-            <span className="flex size-9 items-center justify-center rounded-full bg-muted text-sm font-medium text-muted-foreground">
-              {[...user.email.trim()][0]?.toUpperCase() ?? "我"}
-            </span>
-            会员中心
-          </Link>
-        ) : (
-          <Link
-            href="/login"
-            onClick={onNavigate}
-            className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-          >
-            登录
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          {user ? (
+            <Link
+              href="/me"
+              onClick={onNavigate}
+              aria-label={`我的权益（${user.email}）`}
+              title={user.email}
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-full py-0.5 pr-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-muted-foreground">
+                {[...user.email.trim()][0]?.toUpperCase() ?? "我"}
+              </span>
+              <span className="truncate">会员中心</span>
+            </Link>
+          ) : (
+            <Button asChild variant="outline" size="sm" className="h-9 flex-1 rounded-full">
+              <Link href="/login" onClick={onNavigate}>
+                登录
+              </Link>
+            </Button>
+          )}
+          <ThemeToggle compact />
+        </div>
       </div>
     </div>
   );

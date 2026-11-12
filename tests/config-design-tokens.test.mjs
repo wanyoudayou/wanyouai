@@ -61,7 +61,7 @@ for (const [mode, colors] of Object.entries(tokens.themes)) {
 
 test("brand colors are preserved while typography has no network dependency", () => {
   assert.equal(tokens.themes.light["opc-primary"], "#7C6CFF");
-  assert.equal(tokens.themes.dark["opc-primary"], "#4ADE80");
+  assert.equal(tokens.themes.dark["opc-primary"], "#A594FF");
   assert.match(tokens.shared["opc-font-body"], /system-ui/);
   assert.match(tokens.shared["opc-font-mono"], /ui-monospace/);
   const css = readFileSync(

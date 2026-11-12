@@ -21,7 +21,7 @@ async function fetchAll(
     readAllAdminRows<EntitlementLike>(
       service,
       "entitlements",
-      "id,user_id,type,ends_at,revoked_at,created_at",
+      "id,user_id,type,starts_at,ends_at,revoked_at,created_at",
     ),
     readAllAdminRows<OrderLike>(service, "orders", "id,user_id,created_at"),
   ]);

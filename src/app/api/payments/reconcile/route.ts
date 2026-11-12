@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { bearerMatches } from "@/lib/server-bearer";
 import { settleIfPaidRemotely } from "@/lib/payments/settle";
-import { getUserIdentity } from "@/lib/account/session";
+import { getAdminIdentity } from "@/lib/admin/session";
+import { sameSiteOrigin } from "@/lib/publishing/auth";
 import { zpayProviderFromEnv } from "@/lib/payments/zpay";
 import type { PaymentOrder } from "@/lib/payments/types";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { reconcileBatch, reconcileCursor } from "@/lib/payments/reconcile";
 
@@ -14,13 +14,10 @@ export const maxDuration = 60;
 
 const tokenAllowed = (request: Request): boolean => bearerMatches(request, process.env.PUBLISH_TOKEN);
 
-async function ownerAllowed(): Promise<boolean> {
-  const { user } = await getUserIdentity();
-  if (!user) return false;
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.from("profiles").select("is_owner").eq("id", user.id).maybeSingle();
-  if (error) throw new Error("Owner verification unavailable");
-  return data?.is_owner === true;
+/** 站主会话路径：与其他后台写接口一致，要求同源并经 is_owner 统一判定。 */
+async function ownerAllowed(request: Request): Promise<boolean> {
+  if (!sameSiteOrigin(request.headers.get("origin"), process.env.SITE_URL)) return false;
+  return (await getAdminIdentity()).owner;
 }
 
 export async function POST(request: Request) {
@@ -28,7 +25,7 @@ export async function POST(request: Request) {
   const signal = AbortSignal.any([request.signal, AbortSignal.timeout(45_000)]);
   const headers = { "Cache-Control": "no-store" };
   try {
-    if (!tokenAllowed(request) && !(await ownerAllowed())) {
+    if (!tokenAllowed(request) && !(await ownerAllowed(request))) {
       return NextResponse.json({ message: "未授权" }, { status: 401, headers });
     }
     const after = reconcileCursor(new URL(request.url).searchParams);

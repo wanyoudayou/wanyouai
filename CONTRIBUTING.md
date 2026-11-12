@@ -28,6 +28,8 @@ npm run build
 
 按改动范围运行 `test:content`、`test:publish`、`test:admin`、`test:avatar`、`test:config`、`test:storage`。数据库还须运行 `db:baseline:check`、`drill:fresh-db` 及相关数据库测试；涉及交易并发时运行 `test:db:concurrency`。`typecheck` 与 `build` 顺序运行，避免同时读写 Next 生成类型。完整 CI 步骤见 [.github/workflows/ci.yml](.github/workflows/ci.yml)。
 
+交互栏目在 `src/sections/<name>/` 实现，路径 `/lab/<name>`，只能通过 `@/sections/_sdk` 使用主站能力；用 `node scripts/new-section.mjs` 或 `.claude/skills/new-section/` 创建，规则与守卫见[自定义导航与代码栏目](docs/development/custom-sections.md)。
+
 页面改动按验收矩阵检查匿名 / 登录身份、错误 / 空态及响应式；本地模拟通过不能写成真实 Supabase 或浏览器验收通过。
 
 ## 提交问题与变更

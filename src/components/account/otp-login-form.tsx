@@ -11,11 +11,13 @@ type VerifyAction = (prev: { message: string }, form: FormData) => Promise<{ mes
  * 邮箱免密登录：可输入邮件里的验证码，也可打开登录链接。
  * 新 Free 项目的默认邮件模板只有链接；配置自定义 SMTP 后可加入验证码。
  */
-export function OtpLoginForm({ sendAction, verifyAction, emailLabel, note }: {
+export function OtpLoginForm({ sendAction, verifyAction, emailLabel, note, returnTo }: {
   sendAction: SendAction;
   verifyAction: VerifyAction;
   emailLabel: string;
   note: string;
+  /** 登录后返回的站内路径；服务端会再次校验。 */
+  returnTo?: string;
 }) {
   const [stage, setStage] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
@@ -45,6 +47,7 @@ export function OtpLoginForm({ sendAction, verifyAction, emailLabel, note }: {
   }
   return (
     <form action={sendFormAction} className="flex w-full max-w-md flex-col gap-4">
+      {returnTo && <input type="hidden" name="next" value={returnTo} />}
       <label htmlFor="login-email" className="text-sm font-medium">{emailLabel}</label>
       <Input id="login-email" name="email" type="email" autoComplete="email" required maxLength={254} placeholder="you@example.com" disabled={sending} />
       <Button type="submit" disabled={sending}>{sending ? "正在发送…" : "发送登录邮件"}</Button>

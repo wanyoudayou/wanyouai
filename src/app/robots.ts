@@ -11,7 +11,9 @@ export default function robots(): MetadataRoute.Robots {
       disallow: [
         "/admin",
         "/api/",
-        "/me",
+        // 用 "/me/" 与 "/me$"：单写 "/me" 会按前缀连带屏蔽 /media 下的公开图片。
+        "/me$",
+        "/me/",
         "/checkout",
         "/login",
         "/auth/",

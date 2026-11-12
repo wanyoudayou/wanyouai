@@ -1,5 +1,17 @@
 /** 服务订单追踪展示逻辑（纯函数，可测）。 */
 
+/** 服务订单状态的短标签：后台流水线、后台列表与“我的”页共用同一套文案。 */
+export const BOOKING_STATUS_LABEL: Record<string, string> = {
+  inquiry: "询价",
+  quoted: "已报价",
+  booked: "已成交",
+  in_progress: "交付中",
+  delivered: "已交付",
+  accepted: "已验收",
+  settled: "已结案",
+  declined: "已婉拒",
+};
+
 export const BOOKING_STAGES: Record<string, { label: string; clientHint: string }> = {
   inquiry: { label: "询价已收到", clientHint: "站主已收到你的询价，会通过你留下的邮箱回复。" },
   quoted: { label: "报价待你确认", clientHint: "站主已发送报价单，请在下方查看并选择接受或谢绝。" },

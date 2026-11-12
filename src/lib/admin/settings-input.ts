@@ -1,5 +1,6 @@
 import Ajv2020 from "ajv/dist/2020.js";
 import { sanitizeCustomHtml } from "@/lib/custom-pages/sanitize";
+import { PAYMENT_CURRENCY } from "@/lib/format";
 import addFormats from "ajv-formats";
 import schema from "../../../docs/contracts/site-config.schema.json";
 const ajv = new Ajv2020({ strict: false, allErrors: true });
@@ -23,7 +24,7 @@ const list = (form: FormData, name: string) =>
 function checkUrl(form: FormData, name: string, label: string) {
   const url = value(form, name);
   if (!url) return;
-  if (url.startsWith("/")) return;
+  if (/^\/(?![\/\\])/.test(url)) return;
   try {
     if (new URL(url).protocol === "https:") return;
   } catch {
@@ -39,6 +40,8 @@ function checkSlug(slug: string, label: string) {
     throw new Error(`${label}选择无效，请刷新后重试。`);
 }
 
+// Ajv 按对象身份缓存已编译的 schema；每次保存都新建 schema 会让缓存不断增长，这里按 key 只编译一次。
+const compiledSubs = new Map<string, ReturnType<typeof ajv.compile>>();
 function compileSub(
   key:
     | "identity"
@@ -52,7 +55,11 @@ function compileSub(
     key === "home_config"
       ? { $defs: schema.$defs, $ref: "#/$defs/home_config" }
       : schema.properties[key as keyof typeof schema.properties];
-  return ajv.compile({ $schema: schema.$schema, $defs: schema.$defs, ...sub });
+  const cached = compiledSubs.get(key);
+  if (cached) return cached;
+  const compiled = ajv.compile({ $schema: schema.$schema, $defs: schema.$defs, ...sub });
+  compiledSubs.set(key, compiled);
+  return compiled;
 }
 
 const SOCIAL_KEYS = [
@@ -75,7 +82,7 @@ function parseSocialLinks(form: FormData) {
       throw new Error("自媒体平台类型无效，请刷新后重试。");
     if (!label || label.length > 40)
       throw new Error("每条平台露出需填写 40 字以内的显示名。");
-    if (!url || (!/^https:\/\//.test(url) && !url.startsWith("/")))
+    if (!url || (!/^https:\/\//.test(url) && !/^\/(?![\/\\])/.test(url)))
       throw new Error("平台链接需为 https 地址或站内 / 路径。");
     rows.push({ platform, label, url, ...(note ? { note } : {}) });
   }
@@ -229,6 +236,11 @@ export function parseSiteSettings(form: FormData) {
   if (form.has("payment_enabled") && payment_channels.length === 0)
     throw new Error("开通在线收款至少需要选择一个支付渠道。");
   const amount = value(form, "amount");
+  if (
+    form.has("payment_enabled") &&
+    (value(form, "currency") || PAYMENT_CURRENCY) !== PAYMENT_CURRENCY
+  )
+    throw new Error("在线收款按人民币结算；开通在线收款时币种需为人民币 CNY。");
   const commerce = {
     payment_enabled: form.has("payment_enabled"),
     payment_channels,

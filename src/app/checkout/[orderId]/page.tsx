@@ -10,6 +10,7 @@ import { OrderContentLink } from "@/components/account/order-content-link";
 import { zpayProviderFromEnv } from "@/lib/payments/zpay";
 import { settleIfPaidRemotelyWithRetry } from "@/lib/payments/settle";
 import { ReturnPoll } from "@/components/checkout/return-poll";
+import { loginHref } from "@/lib/account/auth-flow";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/shared/callout";
@@ -34,7 +35,7 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
   const orderId = Number((await params).orderId);
   if (!Number.isInteger(orderId) || orderId <= 0) notFound();
   const { user } = await getUserIdentity();
-  if (!user) redirect("/login");
+  if (!user) redirect(loginHref(`/checkout/${orderId}`));
   const supabase = await createSupabaseServerClient();
   const [{ data: order }, site] = await Promise.all([
     supabase.from("orders").select("id,sku_type,target_id,amount,status,created_at,merchant_order_no").eq("id", orderId).maybeSingle(),

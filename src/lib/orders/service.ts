@@ -88,12 +88,11 @@ function parseSkuInput(raw: unknown): {
   return { sku_type: sku as SkuType, target_id: target };
 }
 
-export async function createOrder(
+/** 当前可售价格（服务端权威）；不可售时抛 NOT_SELLABLE。建单与跳转收银台前的复核共用。 */
+export async function currentSellablePrice(
   gateway: OrderGateway,
-  userId: string,
-  raw: unknown,
-): Promise<OrderRow> {
-  const input = parseSkuInput(raw);
+  input: { sku_type: SkuType; target_id: number | null },
+): Promise<number> {
   let amount: number;
   if (input.sku_type === "subscription") {
     const price = await gateway.subscriptionPrice();
@@ -143,6 +142,16 @@ export async function createOrder(
       );
     amount = Number(article.price);
   }
+  return amount;
+}
+
+export async function createOrder(
+  gateway: OrderGateway,
+  userId: string,
+  raw: unknown,
+): Promise<OrderRow> {
+  const input = parseSkuInput(raw);
+  const amount = await currentSellablePrice(gateway, input);
   const entitlements = await gateway.activeEntitlements(userId);
   const now = Date.now();
   const active = (type: string, target: number | null) =>

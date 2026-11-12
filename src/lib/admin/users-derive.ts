@@ -1,4 +1,5 @@
 /** 后台用户列表的纯推导层。无服务端依赖、不 import "server-only"，供 tsx 单测直接导入。 */
+import { csvLine } from "./csv";
 
 export type AdminUserRow = {
   id: string;
@@ -18,7 +19,7 @@ export type AdminUserDetail = {
   entitlements: { id: number; type: string; target_id: number | null; starts_at: string; ends_at: string | null; revoked_at: string | null; source: string }[];
 };
 
-export type EntitlementLike = { user_id: string; type: string; ends_at: string | null; revoked_at: string | null; created_at: string };
+export type EntitlementLike = { user_id: string; type: string; starts_at?: string | null; ends_at: string | null; revoked_at: string | null; created_at: string };
 export type OrderLike = { user_id: string; created_at: string };
 export type UserLike = { id: string; email: string; created_at: string };
 
@@ -48,8 +49,12 @@ export function deriveUserRow(
 ): AdminUserRow {
   const mine = entitlements.filter((e) => e.user_id === user.id);
   const myOrders = orders.filter((o) => o.user_id === user.id);
-  const activeSubs = mine.filter((e) => e.type === "subscription" && !e.revoked_at && (!e.ends_at || Date.parse(e.ends_at) > now.getTime()));
-  const subEnds = activeSubs.map((e) => e.ends_at).filter((v): v is string => v !== null).sort();
+  // 与 admin_user_directory 同口径：已开始、未撤销、未到期；任一有效订阅为永久则视为永久。
+  const activeSubs = mine.filter((e) => e.type === "subscription" && !e.revoked_at
+    && (!e.starts_at || Date.parse(e.starts_at) <= now.getTime())
+    && (!e.ends_at || Date.parse(e.ends_at) > now.getTime()));
+  const permanent = activeSubs.some((e) => e.ends_at === null);
+  const subEnds = permanent ? [] : activeSubs.map((e) => e.ends_at).filter((v): v is string => v !== null).sort();
   const activity = [user.created_at, ...mine.map((e) => e.created_at), ...myOrders.map((o) => o.created_at)]
     .filter((v) => Number.isFinite(Date.parse(v)))
     .sort();
@@ -66,11 +71,10 @@ export function deriveUserRow(
 
 /** 运营邮件名单 CSV：仅有效订阅者。 */
 export function buildSubscriberCsv(rows: AdminUserRow[]): string {
-  const escape = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
   const lines = ["email,subscription_ends_at"];
   for (const row of rows) {
     if (!row.subscriptionActive) continue;
-    lines.push(`${escape(row.email)},${row.subscriptionEndsAt ?? "永久"}`);
+    lines.push(csvLine([row.email, row.subscriptionEndsAt ?? "永久"]));
   }
   return lines.join("\n") + "\n";
 }

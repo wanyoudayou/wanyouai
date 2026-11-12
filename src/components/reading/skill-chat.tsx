@@ -1,4 +1,5 @@
 "use client";
+import { readJson, RequestError, requestErrorMessage } from "@/lib/http-client";
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
@@ -25,9 +26,7 @@ function useSkillConversation({ skill, title, guide, initialSession }: { skill: 
   const inFlight = useRef(false);
   const readTurns = async (id: string, signal: AbortSignal) => {
     const response = await fetch(`/api/skills/chat?skill=${skill}&session=${encodeURIComponent(id)}`, { cache: "no-store", signal });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message);
-    return data as { turns: Turn[]; version: string };
+    return readJson<{ turns: Turn[]; version: string }>(response, "对话暂时无法读取，请稍后查询状态。");
   };
   const applyTurns = (data: { turns: Turn[]; version: string }) => {
     setTurns(data.turns); setVersion(data.version);
@@ -39,7 +38,7 @@ function useSkillConversation({ skill, title, guide, initialSession }: { skill: 
     const controller = new AbortController();
     void readTurns(initialSession, AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]))
       .then(data => { if (active) applyTurns(data); })
-      .catch(error => { if (active) { setUnknown(true); setMessage(error instanceof Error ? error.message : "对话暂时无法读取，请查询状态。"); } })
+      .catch(error => { if (active) { setUnknown(true); setMessage(requestErrorMessage(error, "对话暂时无法读取，请查询状态。")); } })
       .finally(() => { if (active) setBusy(false); });
     return () => { active = false; controller.abort(); };
     // The provider is keyed by Skill identity; toggling panels never reloads or submits a turn.
@@ -55,16 +54,25 @@ function useSkillConversation({ skill, title, guide, initialSession }: { skill: 
     setTurns(rows => [...rows, { id, question: text, answer: null, state: "running" }]);
     try {
       const response = await fetch("/api/skills/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ skill, session: current, id, question: text }), signal: AbortSignal.timeout(55000) });
-      const result = await response.json(); if (!response.ok) throw new Error(result.message);
+      await readJson(response, "本轮暂时无法确认，请查询状态；不会重复提交问题。");
       applyTurns(await readTurns(current, AbortSignal.timeout(15000))); setQuestion("");
-    } catch (error) { setUnknown(true); setMessage(error instanceof Error ? error.message : "响应中断，请查询状态；不会重复提交问题。"); }
+    } catch (error) {
+      if (error instanceof RequestError && error.rejected) {
+        // 服务端明确拒绝：本轮未执行，撤回乐观插入的轮次，保留输入以便修改。
+        setTurns(rows => rows.filter(turn => turn.id !== id));
+        setMessage(error.message);
+      } else {
+        setUnknown(true);
+        setMessage(requestErrorMessage(error, "响应中断，请查询状态；不会重复提交问题。"));
+      }
+    }
     finally { inFlight.current = false; setBusy(false); }
   }
   async function refresh() {
     if (busy || inFlight.current || !session) return;
     inFlight.current = true; setBusy(true);
     try { applyTurns(await readTurns(session, AbortSignal.timeout(15000))); setMessage("状态已更新。"); }
-    catch (error) { setMessage(error instanceof Error ? error.message : "状态暂时不可读。"); }
+    catch (error) { setMessage(requestErrorMessage(error, "状态暂时不可读。")); }
     finally { inFlight.current = false; setBusy(false); }
   }
   function reset() {
@@ -94,7 +102,7 @@ export function SkillChat() {
       </section>
       <div aria-live="polite" className="flex min-w-0 flex-col gap-3">{chat.turns.map(turn => <div key={turn.id} className="flex min-w-0 flex-col gap-3">
         <ConversationBubble user>{turn.question}</ConversationBubble>
-        <ConversationBubble>{turn.answer ? <ChatMarkdown markdown={turn.answer} allowImages={false} /> : <p className="text-muted-foreground">{turn.state === "running" ? "正在处理…" : turn.state === "unknown" ? "本轮结果未确认，已派发调用可能计费。" : "本轮未生成回答。"}</p>}</ConversationBubble>
+        <ConversationBubble>{turn.answer ? <ChatMarkdown markdown={turn.answer} /> : <p className="text-muted-foreground">{turn.state === "running" ? "正在处理…" : turn.state === "unknown" ? "本轮结果未确认，已派发调用可能计费。" : "本轮未生成回答。"}</p>}</ConversationBubble>
       </div>)}</div>
     </ConversationBody>
     <div className="space-y-2 border-t p-3">

@@ -61,7 +61,7 @@ export async function answerAvatarQuestion(input: {
     const evidence = hits.filter(hit => !hit.gated && hit.content.trim());
     if (!evidence.length) {
       await finishAICall(service, requestId, "released");
-      return { status: "retrieval", text: hits.length ? `相关内容尚未解锁，可先查看试读与购买入口：\n\n${toSources(hits).map(source => `- [${source.title}](${source.url})`).join("\n")}` : "本站知识库中没有找到足够相关的资料，暂不能据此回答。可以换个具体说法，或浏览内容目录。", sources: toSources(hits) };
+      return { status: "retrieval", text: hits.length ? `相关内容尚未解锁，可先查看试读与购买入口：\n\n${toSources(hits).map(source => `- [${source.title}](${source.url})`).join("\n")}` : "本站知识库中没有找到足够相关的资料，暂不能据此回答。可以换个具体说法，或浏览内容目录；如需了解站主，请访问[名片页面](/card)。", sources: toSources(hits) };
     }
     const [control, settings] = await Promise.all([
       service.from("knowledge_index_control").select("source_revision,active_generation").eq("id", 1).single(),

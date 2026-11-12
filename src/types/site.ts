@@ -96,7 +96,6 @@ export interface CommerceConfig {
 export interface AvatarConfig {
   /** 分身总开关（一键关闭）；默认关。 */
   enabled: boolean;
-  model: string | null;
   /** 月度生成次数上限（站级熔断护栏）；null = 不设限。 */
   monthlyLimit: number | null;
   anonymousEntry: boolean;
@@ -176,7 +175,7 @@ export function normalizeHomeConfig(raw: unknown): HomeConfig {
     blocks.push({
       type: mapped,
       enabled: item.enabled !== false,
-      title: optionalString(item.title, 60) ?? HOME_BLOCK_TITLES[item.type as HomeBlockType],
+      title: optionalString(item.title, 60) ?? HOME_BLOCK_TITLES[mapped],
       empty_text: optionalString(item.empty_text, 120),
       cta_label: optionalString(item.cta_label, 40),
       limit: clampLimit(item.limit),
@@ -228,8 +227,8 @@ export function normalizeIdentityConfig(raw: unknown): IdentityConfig {
     socialLinks: (Array.isArray(source.social_links) ? source.social_links : []).flatMap((item) => {
       if (!isRecord(item) || typeof item.platform !== "string" || !(item.platform in SOCIAL_PLATFORMS)) return [];
       const label = optionalString(item.label, 40);
-      const url = optionalString(item.url, 2048);
-      if (!label || !url || (!/^https:\/\//.test(url) && !url.startsWith("/"))) return [];
+      const url = safeHref(item.url);
+      if (!label || !url) return [];
       const note = optionalString(item.note, 80);
       return [{ platform: item.platform as SocialPlatform, label, url, ...(note ? { note } : {}) }];
     }).slice(0, 8),
@@ -262,11 +261,19 @@ function pageHref(slug: unknown): string | null {
   return null;
 }
 
+/** 站内路径（单个 / 开头，排除 //host 与反斜杠）或 https 地址；其余（含 javascript:）返回 null。 */
+export function safeHref(value: unknown, max = 2048): string | null {
+  const url = optionalString(value, max);
+  if (!url) return null;
+  if (/^\/(?![\/\\])/.test(url)) return url;
+  try { return new URL(url).protocol === "https:" ? url : null; } catch { return null; }
+}
+
 export function normalizeContactConfig(raw: unknown): ContactConfig {
   const source = isRecord(raw) ? raw : {};
   return {
     email: optionalString(source.email, 254),
-    bookingUrl: pageHref(source.booking_page) ?? optionalString(source.booking_url, 2048),
+    bookingUrl: pageHref(source.booking_page) ?? safeHref(source.booking_url),
   };
 }
 
@@ -285,7 +292,7 @@ export function normalizeCommerceConfig(raw: unknown): CommerceConfig {
     paymentEnabled: source.payment_enabled === true,
     paymentChannels: channels.length ? channels : ["alipay"],
     subscriptionPrice,
-    refundPolicyUrl: pageHref(source.refund_policy_page) ?? optionalString(source.refund_policy_url, 2048),
+    refundPolicyUrl: pageHref(source.refund_policy_page) ?? safeHref(source.refund_policy_url),
     subscribePage: pageHref(source.subscribe_page) ? (source.subscribe_page as string) : null,
   };
 }
@@ -294,7 +301,6 @@ export function normalizeAvatarConfig(raw: unknown): AvatarConfig {
   const source = isRecord(raw) ? raw : {};
   return {
     enabled: source.enabled === true && source.knowledge_ready === true,
-    model: null,
     monthlyLimit: typeof source.monthly_limit === "number" && Number.isFinite(source.monthly_limit) && source.monthly_limit >= 0 ? source.monthly_limit : null,
     anonymousEntry: source.anonymous_entry === true,
   };

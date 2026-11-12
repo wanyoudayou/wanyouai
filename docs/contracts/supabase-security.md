@@ -61,7 +61,9 @@ is_owner 是 RLS 避免 profiles 递归所需的受控布尔函数，匿名调�
 
 维护源 `migrations/20260928155549_security_review_payment_and_visibility.sql`：父专辑生命周期进入文章 RLS，正文 / chunk 子查询继承该闸门；API owner 的状态转移与 paused_at 由触发器保护。原始会话始终私有，客户端不可 INSERT；conversation_publications 独立保存站主编辑的公开稿，显式 RLS 和角色授权。review_conversation 为 authenticated / owner 的 SECURITY INVOKER 事务入口。
 
-create_pending_order / settle_payment 仅 service_role EXECUTE；前者事务内复核售价、资格并复用同价 pending，后者先验金额 / 状态 / 事件归属，以平台流水统一去重；两者使用事务锁防竞争。不得把数据库权限正确当作已修复旧应用的签名解析或共享缓存问题。边界见[安全摘要](../development/security-review.md)。
+nav_items 启用 RLS，仅站主（`is_owner()`）可读写，anon 无表授权；前台导航只调用 public_navigation()（SECURITY DEFINER、空 search_path，anon / authenticated / service_role 可执行），只返回已启用且目标公开可读的项目与渲染字段。save_nav_items 为 SECURITY INVOKER 的站主事务入口（advisory lock + nav_items_version() 乐观版本，整表替换），仅 authenticated EXECUTE，非站主报 OWNER_REQUIRED；表约束限定类型与目标一一对应、外链仅 https、访问级别只用于代码栏目、`group` 只能在顶层；`guard_nav_item_parent()` 触发器（无任何角色 EXECUTE）保证 `parent_id` 指向顶层 `group`。public_navigation() 另返回 `parent_id`，停用目录的子项不返回。
+
+register_for_event 仅 authenticated EXECUTE（SECURITY DEFINER，按 auth.uid() 写本人报名，活动行锁内复核资格与名额，客户端仍无 registrations 写权限）。submit_evaluation（authenticated，仅已结案订单的客户本人一单一评）、public_service_evaluations（anon / authenticated，只返回评分、内容与时间）、checkin_lookup（anon / authenticated，报名邮箱仅对站主返回）均为 SECURITY DEFINER 窄入口，普通页面与用户动作不再使用 service_role 读写 bookings、evaluations、registrations。request_limits 启用 RLS 且只授权 service_role；consume_request_limit 以单条 upsert 原子计数（按站点时区的日期分桶），submit_service_inquiry 让询价单与站主收件箱同事务提交，二者仅 service_role EXECUTE。create_pending_order / settle_payment 仅 service_role EXECUTE；前者事务内复核售价、资格并复用同价 pending，后者先验金额 / 状态 / 事件归属，以平台流水统一去重；两者使用事务锁防竞争。不得把数据库权限正确当作已修复旧应用的签名解析或共享缓存问题。边界见[安全摘要](../development/security-review.md)。
 
 ## 导出快照
 

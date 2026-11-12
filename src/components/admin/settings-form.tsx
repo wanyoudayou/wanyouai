@@ -5,8 +5,11 @@ import { CustomHtmlBody } from "@/components/custom/custom-html-body";
 import { saveSettings } from "@/app/admin/settings/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useUnsavedChanges } from "./use-unsaved-changes";
 import { ImageField, MediaPicker } from "./media-library";
 import { assetImageHtml } from "@/lib/media/html";
+import { CURRENCY_OPTIONS } from "@/lib/format";
 import {
   HOME_BLOCK_TITLES,
   SOCIAL_PLATFORMS,
@@ -15,7 +18,7 @@ import {
 } from "@/types/site";
 import type { SiteContext } from "@/lib/get-site-config";
 const facts: Record<FactBadgeType, string> = {
-  series_count: "专辑数",
+  series_count: "手册与活动数",
   article_count: "文章数",
   subscription_price: "订阅价格",
   service_capacity: "服务容量",
@@ -40,225 +43,288 @@ export function SettingsForm({
     ? site.commerce.refundPolicyUrl.slice(3)
     : "";
   const subscribePageSlug = site.commerce.subscribePage ?? "";
-  const fields = [
-    ["tagline", "站点简介", site.tagline ?? ""],
-    ["ask_placeholder", "首页提问提示", site.home.askPlaceholder],
-    ["banner_light_url", "首页横幅 · 浅色模式", site.home.bannerLightUrl ?? ""],
-    ["banner_dark_url", "首页横幅 · 深色模式", site.home.bannerDarkUrl ?? ""],
-    [
-      "amount",
-      "年度订阅价格（留空表示未开通订阅）",
-      String(site.commerce.subscriptionPrice?.amount ?? ""),
-    ],
-    ["currency", "币种", site.commerce.subscriptionPrice?.currency ?? "CNY"],
-  ];
+  const currency = site.commerce.subscriptionPrice?.currency ?? "CNY";
+  const [dirty, setDirty] = useState(false);
+  useUnsavedChanges(dirty);
+  const textField = (name: string, label: string, value: string) => (
+    <label key={name} className="space-y-1 text-sm">
+      {label}
+      <Input name={name} defaultValue={value} maxLength={2048} />
+    </label>
+  );
   return (
-    <form action={action} className="space-y-6">
+    <form
+      action={action}
+      onChange={() => setDirty(true)}
+      onSubmit={() => setDirty(false)}
+      className="space-y-6"
+    >
       <input type="hidden" name="updated" value={updated} />
-      <p className="rounded-lg bg-muted px-3 py-2 text-xs leading-[1.7] text-muted-foreground">
-        设置首页展示、订阅与收款、政策和页脚。站主资料在「站主名片」管理，模型与额度在「站主分身」管理。
+      <p className="text-sm text-muted-foreground">
+        站主资料在「站主名片」管理，模型与额度在「AI 设置」管理。两个分页共用一次保存。
       </p>
-      <fieldset disabled={pending} className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2">
-          {fields.map(([name, label, value]) =>
-            name.startsWith("banner_") ? (
-              <ImageField
-                key={name}
-                name={name}
-                label={label}
-                defaultValue={value}
-                disabled={pending}
-              />
-            ) : (
-              <label key={name} className="space-y-1 text-sm">
-                {label}
-                <Input name={name} defaultValue={value} maxLength={2048} />
-              </label>
-            ),
-          )}
-          <label className="space-y-1 text-sm">
-            退款政策页面（自定义页；结算页与页脚的「退款政策」指向它）
-            <select
-              name="refund_policy_page"
-              defaultValue={refundPageSlug}
-              className="block w-full rounded-md border bg-background p-2"
-            >
-              <option value="">不设置</option>
-              {customPages.map((page) => (
-                <option key={page.slug} value={page.slug}>
-                  {page.title}（/p/{page.slug}）
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex items-center gap-2 self-end pb-2 text-sm">
-            <input
-              type="checkbox"
-              name="hero_enabled"
-              defaultChecked={site.home.heroEnabled}
-            />
-            显示首页横幅
-          </label>
-        </div>
-        <p className="text-xs leading-6 text-muted-foreground">
-          横幅按外观模式切换，每一版留空时使用对应的内置背景。浅色模式使用深色文字，深色模式使用浅色文字。
-        </p>
-        <label className="flex gap-2 text-sm">
-          <input
-            type="checkbox"
-            name="footer_credit"
-            defaultChecked={site.footerCredit}
-          />
-          显示 Powered by 万有AI
-        </label>
-        <CustomZoneEditor
-          html={site.home.customZone.html}
-          enabled={site.home.customZone.enabled}
-          pages={customPages}
-          fieldPrefix="custom_zone"
-          title="首页自定义区"
-          description="显示在首页大横幅与内容区块之间，可编辑、预览或从自定义页复制。"
-          aiContext="section"
-          avatarReady={avatarKeySet}
-        />
-        <h2 className="text-lg font-medium">在线收款</h2>
-        <label className="block max-w-md space-y-1 text-sm">
-          左栏订阅按钮落点（默认名片页；选自定义页时，该页内需插入 cp-subscribe
-          占位符，跳转自动定位到订阅按钮）
-          <select
-            name="subscribe_page"
-            defaultValue={subscribePageSlug}
-            className="block w-full rounded-md border bg-background p-2"
-          >
-            <option value="">默认（名片页 /card#pricing）</option>
-            {customPages.map((page) => (
-              <option key={page.slug} value={page.slug}>
-                {page.title}（/p/{page.slug}#pricing）
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex gap-2 text-sm">
-          <input
-            type="checkbox"
-            name="payment_enabled"
-            defaultChecked={site.commerce.paymentEnabled}
-          />
-          开通在线收款（zpay）
-        </label>
-        <div className="flex flex-wrap gap-4 text-sm">
-          {(
-            [
-              ["alipay", "支付宝"],
-              ["wxpay", "微信支付"],
-            ] as const
-          ).map(([channel, label]) => (
-            <label key={channel} className="flex gap-2">
-              <input
-                type="checkbox"
-                name={`channel.${channel}`}
-                defaultChecked={site.commerce.paymentChannels.includes(channel)}
-              />
-              {label}
-            </label>
-          ))}
-        </div>
-        <p className="text-sm text-muted-foreground">
-          所选渠道需已在 zpay 商户中心开通，否则买家无法完成支付。
-        </p>
-        <p className="text-sm text-muted-foreground">
-          {zpayReady
-            ? "支付通道已配置，保存后前台购买按钮即点亮。"
-            : "收款商户尚未配置完成，勾选也不会点亮前台购买。"}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          提醒：在线收款为四方支付通道，存在资金冻结风险，请勤提现、余额不过夜。
-        </p>
-        <h2 className="text-lg font-medium">首页五块</h2>
-        <p className="text-sm text-muted-foreground">
-          按显示顺序设置，五个内容区块各出现一次；名片 Hero
-          是固定首屏，用上方开关控制显隐。
-        </p>
-        {site.home.blocks.map((block, i) => (
-          <div
-            key={i}
-            className="grid gap-3 rounded-lg border p-4 sm:grid-cols-2"
-          >
-            <label className="text-sm">
-              第 {i + 1} 块
-              <select
-                name={`block.${i}.type`}
-                defaultValue={block.type}
-                className="mt-1 block w-full rounded-md border bg-background p-2"
-              >
-                {Object.entries(HOME_BLOCK_TITLES).map(([type, title]) => (
-                  <option key={type} value={type}>
-                    {title}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                name={`block.${i}.enabled`}
-                defaultChecked={block.enabled}
-              />
-              显示
-            </label>
-            {(
-              [
-                ["title", "标题", block.title],
-                ["empty_text", "空态文案", block.empty_text ?? ""],
-                ["cta_label", "入口文案", block.cta_label ?? ""],
-                ["limit", "展示条数", String(block.limit)],
-              ] as const
-            ).map(([key, label, value]) => (
-              <label key={key} className="text-sm">
-                {label}
-                <Input
-                  name={`block.${i}.${key}`}
-                  defaultValue={value}
-                  maxLength={120}
+      <fieldset disabled={pending} className="min-w-0">
+        <Tabs defaultValue="home" className="space-y-6">
+          <TabsList aria-label="站点配置分组">
+            <TabsTrigger value="home">首页与展示</TabsTrigger>
+            <TabsTrigger value="commerce">收款与价格</TabsTrigger>
+          </TabsList>
+          <TabsContent value="home" forceMount className="space-y-8 data-[state=inactive]:hidden">
+            <section className="space-y-4">
+              <h2 className="text-lg font-medium">首页首屏</h2>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {textField("tagline", "站点简介", site.tagline ?? "")}
+                {textField("ask_placeholder", "首页提问提示", site.home.askPlaceholder)}
+                <ImageField
+                  name="banner_light_url"
+                  label="首页横幅 · 浅色模式"
+                  defaultValue={site.home.bannerLightUrl ?? ""}
+                  disabled={pending}
                 />
+                <ImageField
+                  name="banner_dark_url"
+                  label="首页横幅 · 深色模式"
+                  defaultValue={site.home.bannerDarkUrl ?? ""}
+                  disabled={pending}
+                />
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="hero_enabled"
+                  defaultChecked={site.home.heroEnabled}
+                />
+                显示首页横幅
               </label>
-            ))}
-          </div>
-        ))}
-        <h2 className="text-lg font-medium">首页事实徽章</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {Object.entries(facts).map(([type, label]) => (
-            <div key={type} className="space-y-2">
+              <p className="text-xs leading-6 text-muted-foreground">
+                横幅按外观模式切换，每一版留空时使用对应的内置背景。浅色模式使用深色文字，深色模式使用浅色文字。
+              </p>
+            </section>
+            <CustomZoneEditor
+              html={site.home.customZone.html}
+              enabled={site.home.customZone.enabled}
+              pages={customPages}
+              fieldPrefix="custom_zone"
+              title="首页自定义区"
+              description="显示在首页大横幅与内容区块之间，可编辑、预览或从自定义页复制。"
+              aiContext="section"
+              avatarReady={avatarKeySet}
+            />
+            <section className="space-y-3">
+              <h2 className="text-lg font-medium">首页内容区块</h2>
+              <p className="text-sm text-muted-foreground">
+                按显示顺序排列，五种内容各出现一次；未勾选“显示”的区块不在首页出现。
+              </p>
+              <ol className="space-y-3">
+                {site.home.blocks.map((block, i) => (
+                  <li key={i} className="rounded-lg border bg-card p-4">
+                    <div className="grid gap-3 sm:grid-cols-[3rem_minmax(0,10rem)_minmax(0,1fr)_6rem_auto] sm:items-end">
+                      <span className="text-sm text-muted-foreground sm:pb-2">第 {i + 1} 块</span>
+                      <label className="space-y-1 text-sm">
+                        内容
+                        <select
+                          name={`block.${i}.type`}
+                          defaultValue={block.type}
+                          className="block w-full rounded-md border bg-background p-2"
+                        >
+                          {Object.entries(HOME_BLOCK_TITLES).map(([type, title]) => (
+                            <option key={type} value={type}>
+                              {title}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="space-y-1 text-sm">
+                        标题
+                        <Input name={`block.${i}.title`} defaultValue={block.title} maxLength={120} />
+                      </label>
+                      <label className="space-y-1 text-sm">
+                        展示条数
+                        <Input name={`block.${i}.limit`} defaultValue={String(block.limit)} maxLength={120} />
+                      </label>
+                      <label className="flex items-center gap-2 text-sm sm:pb-2">
+                        <input
+                          type="checkbox"
+                          name={`block.${i}.enabled`}
+                          defaultChecked={block.enabled}
+                        />
+                        显示
+                      </label>
+                    </div>
+                    <details className="mt-3 text-sm">
+                      <summary className="cursor-pointer text-muted-foreground">
+                        空态与入口文案
+                      </summary>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <label className="space-y-1">
+                          空态文案
+                          <Input name={`block.${i}.empty_text`} defaultValue={block.empty_text ?? ""} maxLength={120} placeholder="留空使用默认文案" />
+                        </label>
+                        <label className="space-y-1">
+                          入口文案
+                          <Input name={`block.${i}.cta_label`} defaultValue={block.cta_label ?? ""} maxLength={120} placeholder="留空使用“查看全部”" />
+                        </label>
+                      </div>
+                    </details>
+                  </li>
+                ))}
+              </ol>
+            </section>
+            <section className="space-y-3">
+              <h2 className="text-lg font-medium">首页事实徽章</h2>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {Object.entries(facts).map(([type, label]) => (
+                  <div key={type} className="space-y-2">
+                    <label className="flex gap-2 text-sm">
+                      <input
+                        name={`fact.${type}`}
+                        type="checkbox"
+                        defaultChecked={site.home.factBadges.some(
+                          (badge) => badge.type === type,
+                        )}
+                      />
+                      {label}
+                    </label>
+                    <Input
+                      aria-label={`${label}文案`}
+                      name={`fact.${type}.label`}
+                      defaultValue={
+                        site.home.factBadges.find((badge) => badge.type === type)
+                          ?.label ?? ""
+                      }
+                      maxLength={40}
+                      placeholder="留空使用默认文案"
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
+            <section className="space-y-3">
+              <h2 className="text-lg font-medium">页脚</h2>
               <label className="flex gap-2 text-sm">
                 <input
-                  name={`fact.${type}`}
                   type="checkbox"
-                  defaultChecked={site.home.factBadges.some(
-                    (badge) => badge.type === type,
-                  )}
+                  name="footer_credit"
+                  defaultChecked={site.footerCredit}
                 />
-                {label}
+                显示 Powered by 万有AI
               </label>
-              <Input
-                aria-label={`${label}文案`}
-                name={`fact.${type}.label`}
-                defaultValue={
-                  site.home.factBadges.find((badge) => badge.type === type)
-                    ?.label ?? ""
-                }
-                maxLength={40}
-                placeholder="留空使用默认文案"
-              />
-            </div>
-          ))}
+            </section>
+          </TabsContent>
+          <TabsContent value="commerce" forceMount className="space-y-8 data-[state=inactive]:hidden">
+            <section className="space-y-4">
+              <h2 className="text-lg font-medium">订阅价格</h2>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {textField(
+                  "amount",
+                  "年度订阅价格（留空表示未开通订阅）",
+                  String(site.commerce.subscriptionPrice?.amount ?? ""),
+                )}
+                <label className="space-y-1 text-sm">
+                  币种
+                  <select
+                    name="currency"
+                    defaultValue={currency}
+                    className="block w-full rounded-md border bg-background p-2"
+                  >
+                    {CURRENCY_OPTIONS.some(([code]) => code === currency) ? null : (
+                      <option value={currency}>{currency}</option>
+                    )}
+                    {CURRENCY_OPTIONS.map(([code, label]) => (
+                      <option key={code} value={code}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="block text-xs text-muted-foreground">
+                    用于全站价格显示。在线收款按人民币结算，开通收款时请选人民币。
+                  </span>
+                </label>
+                <label className="space-y-1 text-sm">
+                  左栏订阅按钮落点
+                  <select
+                    name="subscribe_page"
+                    defaultValue={subscribePageSlug}
+                    className="block w-full rounded-md border bg-background p-2"
+                  >
+                    <option value="">默认（名片页 /card#pricing）</option>
+                    {customPages.map((page) => (
+                      <option key={page.slug} value={page.slug}>
+                        {page.title}（/p/{page.slug}#pricing）
+                      </option>
+                    ))}
+                  </select>
+                  <span className="block text-xs text-muted-foreground">
+                    选自定义页时，该页需插入 cp-subscribe 占位符，跳转后自动定位到订阅按钮。
+                  </span>
+                </label>
+                <label className="space-y-1 text-sm">
+                  退款政策页面
+                  <select
+                    name="refund_policy_page"
+                    defaultValue={refundPageSlug}
+                    className="block w-full rounded-md border bg-background p-2"
+                  >
+                    <option value="">不设置</option>
+                    {customPages.map((page) => (
+                      <option key={page.slug} value={page.slug}>
+                        {page.title}（/p/{page.slug}）
+                      </option>
+                    ))}
+                  </select>
+                  <span className="block text-xs text-muted-foreground">
+                    结算页与页脚的“退款政策”指向这个自定义页。
+                  </span>
+                </label>
+              </div>
+            </section>
+            <section className="space-y-3">
+              <h2 className="text-lg font-medium">在线收款</h2>
+              <p className="text-sm text-muted-foreground">
+                {zpayReady
+                  ? "收款商户已配置，保存后前台购买按钮即点亮。"
+                  : "收款商户尚未配置完成，勾选也不会点亮前台购买。"}
+              </p>
+              <label className="flex gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="payment_enabled"
+                  defaultChecked={site.commerce.paymentEnabled}
+                />
+                开通在线收款（zpay）
+              </label>
+              <div className="flex flex-wrap gap-4 text-sm">
+                {(
+                  [
+                    ["alipay", "支付宝"],
+                    ["wxpay", "微信支付"],
+                  ] as const
+                ).map(([channel, label]) => (
+                  <label key={channel} className="flex gap-2">
+                    <input
+                      type="checkbox"
+                      name={`channel.${channel}`}
+                      defaultChecked={site.commerce.paymentChannels.includes(channel)}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                所选渠道需已在 zpay 商户中心开通，否则买家无法完成支付。在线收款为四方支付通道，存在资金冻结风险，请勤提现、余额不过夜。
+              </p>
+            </section>
+          </TabsContent>
+        </Tabs>
+        <div className="sticky bottom-0 z-10 mt-8 flex flex-wrap items-center gap-3 border-t bg-background/95 py-4 backdrop-blur">
+          <Button disabled={pending}>
+            {pending ? "保存中…" : "保存站点配置"}
+          </Button>
+          <p role="status" className="text-sm text-muted-foreground">
+            {state.message || (dirty ? "有未保存的修改" : "")}
+          </p>
         </div>
-        <Button disabled={pending}>
-          {pending ? "保存中…" : "保存站点配置"}
-        </Button>
       </fieldset>
-      <p role="status" className="text-sm">
-        {state.message}
-      </p>
     </form>
   );
 }
@@ -295,11 +361,16 @@ export function CustomZoneEditor({
   useEffect(() => {
     if (mode !== "preview" || !previewStale) return;
     let stale = false;
+    // 失败（含会话过期）也要结束“更新中”状态并提示，不能让预览永远停在加载中。
     previewPageHtml(html).then((result) => {
-      if (!stale && result.ok) {
-        setPreview(result.html);
-        setPreviewStale(false);
-      }
+      if (stale) return;
+      if (result.ok) setPreview(result.html);
+      else setAiMessage("预览暂时不可用，请确认登录状态后重试；编辑内容已保留。");
+      setPreviewStale(false);
+    }).catch(() => {
+      if (stale) return;
+      setAiMessage("预览暂时不可用，请稍后重试；编辑内容已保留。");
+      setPreviewStale(false);
     });
     return () => {
       stale = true;
@@ -315,6 +386,7 @@ export function CustomZoneEditor({
         setAiMessage("页面暂时无法读取，原有内容已保留。");
         return;
       }
+      if (html.trim() && !window.confirm("用所选页面的内容覆盖当前编辑区？")) return;
       setHtml(result.html);
       setPreviewStale(true);
     } catch {
@@ -494,7 +566,8 @@ export function SocialLinksEditor({
     note?: string;
   }[];
 }) {
-  const [rows, setRows] = useState(links.length ? links : []);
+  // 每行带稳定 id 作为 key：删除中间行时，非受控输入不会错位到相邻行。
+  const [rows, setRows] = useState(() => links.map((link) => ({ ...link, rowId: crypto.randomUUID() })));
   return (
     <section className="space-y-3 rounded-lg border p-4">
       <div className="flex items-center justify-between gap-3">
@@ -511,7 +584,7 @@ export function SocialLinksEditor({
           variant="outline"
           disabled={rows.length >= 8}
           onClick={() =>
-            setRows([...rows, { platform: "x", label: "", url: "" }])
+            setRows([...rows, { platform: "x", label: "", url: "", rowId: crypto.randomUUID() }])
           }
         >
           添加平台
@@ -521,7 +594,7 @@ export function SocialLinksEditor({
         <p className="text-sm text-muted-foreground">还没有平台露出。</p>
       ) : null}
       {rows.map((row, i) => (
-        <div key={i} className="flex flex-wrap items-end gap-2">
+        <div key={row.rowId} className="flex flex-wrap items-end gap-2">
           <label className="space-y-1 text-sm">
             平台
             <select
@@ -570,7 +643,7 @@ export function SocialLinksEditor({
             type="button"
             size="sm"
             variant="ghost"
-            onClick={() => setRows(rows.filter((_, j) => j !== i))}
+            onClick={() => setRows(rows.filter((item) => item.rowId !== row.rowId))}
           >
             删除
           </Button>

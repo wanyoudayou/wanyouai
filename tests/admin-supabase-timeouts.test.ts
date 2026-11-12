@@ -10,9 +10,9 @@ const client = (fetchImpl: typeof fetch, timeoutMs = 20, retryReadOnce = false) 
 });
 
 test("machine/signature/Bearer routes skip unrelated browser Auth, while cookie-authorized routes retain it", () => {
-  for (const path of ["/card.json", "/llms.txt", "/api/payments/notify", "/api/cron/mail-outbox", "/api/cron/expiry-reminder"])
+  for (const path of ["/card.json", "/llms.txt", "/api/payments/notify", "/api/cron/mail-outbox", "/api/cron/expiry-reminder", "/api/cron/payment-reconcile", "/api/skills/install", "/api/handbooks/v1/list"])
     assert.equal(needsSessionRefresh(path), false);
-  for (const path of ["/card", "/checkout/7", "/api/payments/reconcile", "/api/orders", "/admin/setup", "/me", "/api/cron/mail-outbox/unrelated"])
+  for (const path of ["/card", "/checkout/7", "/api/payments/reconcile", "/api/orders", "/admin/setup", "/me", "/api/cron/mail-outbox/unrelated", "/api/publish", "/api/publish/media", "/api/handbooks"])
     assert.equal(needsSessionRefresh(path), true);
 });
 

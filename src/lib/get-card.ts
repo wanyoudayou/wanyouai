@@ -18,6 +18,7 @@ export async function getCardCounts(): Promise<{ series: number; articles: numbe
       supabase.from("series").select("id", { count: "exact", head: true }).eq("status", "published"),
       supabase.from("articles").select("id", { count: "exact", head: true }).eq("status", "published"),
     ]);
+    if (series.error || articles.error) throw new Error("名片统计暂时不可用");
     return { series: series.count ?? 0, articles: articles.count ?? 0 };
   } catch (error) {
     console.error("[getCardCounts]", error);

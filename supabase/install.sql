@@ -6401,5 +6401,609 @@ grant execute on function public.commit_series_publication(bigint,timestamptz,uu
 update public.app_schema_version set version='20261026184628' where id=1;
 notify pgrst,'reload schema';
 
+-- Source migration: 20261111000000_event_registration_authority.sql
+
+-- Event registration is one database authority: eligibility, capacity and the
+-- registration row are decided under the event row lock. Paid ticket holders
+-- keep their right to register when the event is paused or full.
+
+create function public.event_capacity_limit(p_capacity text)
+returns integer language sql immutable set search_path='' as $$
+  select nullif(substring(coalesce(p_capacity,'') from '^\s*([0-9]{1,6})'),'')::integer
+$$;
+revoke all on function public.event_capacity_limit(text) from public,anon,authenticated,service_role;
+grant execute on function public.event_capacity_limit(text) to service_role;
+
+-- Seats already promised: registered rows plus valid tickets whose holder has not registered yet.
+create function public.event_committed_seats(p_series bigint)
+returns integer language sql stable set search_path='' as $$
+  select (select count(*) from public.registrations r where r.series_id=p_series and r.status='registered')::integer
+    + (select count(distinct e.user_id) from public.entitlements e
+        where e.type='event' and e.target_id=p_series and e.revoked_at is null
+          and e.starts_at<=now() and (e.ends_at is null or e.ends_at>now())
+          and not exists(select 1 from public.registrations r
+            where r.series_id=p_series and r.user_id=e.user_id and r.status='registered'))::integer
+$$;
+revoke all on function public.event_committed_seats(bigint) from public,anon,authenticated,service_role;
+grant execute on function public.event_committed_seats(bigint) to service_role;
+
+create function public.register_for_event(p_series bigint)
+returns jsonb language plpgsql security definer set search_path='' as $$
+declare
+  v_user uuid := auth.uid();
+  v_email text;
+  s public.series%rowtype;
+  d public.event_details%rowtype;
+  v_ticket boolean;
+  v_subscribed boolean;
+  v_reason text;
+  v_limit integer;
+  v_existing public.registrations%rowtype;
+  v_row public.registrations%rowtype;
+begin
+  if v_user is null then
+    return jsonb_build_object('ok',false,'code','LOGIN_REQUIRED','message','报名需登录（注册即可）。');
+  end if;
+  if p_series is null or p_series<=0 then
+    return jsonb_build_object('ok',false,'code','NOT_FOUND','message','活动不存在');
+  end if;
+  select * into s from public.series where id=p_series and type='event';
+  if not found then return jsonb_build_object('ok',false,'code','NOT_FOUND','message','活动不存在'); end if;
+  -- Serializes with ticket sales (create_pending_order holds FOR SHARE) and other registrations.
+  select * into d from public.event_details where series_id=p_series for update;
+  if not found then return jsonb_build_object('ok',false,'code','NOT_FOUND','message','活动详情未配置'); end if;
+  select email into v_email from auth.users where id=v_user;
+  if v_email is null or btrim(v_email)='' then
+    return jsonb_build_object('ok',false,'code','EMAIL_REQUIRED','message','暂时无法获取账户邮箱，请稍后再试。');
+  end if;
+
+  v_ticket := exists(select 1 from public.entitlements e where e.user_id=v_user and e.type='event' and e.target_id=p_series
+    and e.revoked_at is null and e.starts_at<=now() and (e.ends_at is null or e.ends_at>now()));
+  v_subscribed := exists(select 1 from public.entitlements e where e.user_id=v_user and e.type='subscription'
+    and e.revoked_at is null and e.starts_at<=now() and (e.ends_at is null or e.ends_at>now()));
+
+  -- A ticket survives pause (stop selling, keep serving); only archive or end closes it.
+  if s.status not in ('published','paused') or (s.status='paused' and not v_ticket) then
+    return jsonb_build_object('ok',false,'code','CLOSED','message','暂不可报名：活动未上架');
+  end if;
+  if d.state='ended' then return jsonb_build_object('ok',false,'code','CLOSED','message','暂不可报名：活动已结束'); end if;
+  if d.state<>'registering' then return jsonb_build_object('ok',false,'code','CLOSED','message','暂不可报名：报名未开始'); end if;
+
+  if not v_ticket then
+    if d.kind='member' and not v_subscribed then
+      if coalesce(d.ticket_price,0)>0 then
+        return jsonb_build_object('ok',false,'code','TICKET_REQUIRED','status','ticket_required','price',d.ticket_price,'message','本活动需购票后报名。');
+      end if;
+      return jsonb_build_object('ok',false,'code','SUBSCRIPTION_REQUIRED','status','subscription_required','message','本活动为会员专享，订阅后即可免费报名。');
+    end if;
+    if d.kind<>'member' and coalesce(d.ticket_price,0)>0 then
+      return jsonb_build_object('ok',false,'code','TICKET_REQUIRED','status','ticket_required','price',d.ticket_price,'message','本活动需购票后报名。');
+    end if;
+  end if;
+
+  select * into v_existing from public.registrations where series_id=p_series and email=v_email;
+  if found and v_existing.status<>'cancelled' then
+    return jsonb_build_object('ok',true,'status',v_existing.status,'checkin_token',v_existing.checkin_token,'message','你已报名本活动。');
+  end if;
+
+  -- Ticket holders already hold a counted seat; capacity limits free and member registrations.
+  v_limit := public.event_capacity_limit(d.capacity);
+  if not v_ticket and v_limit is not null and v_limit>0 and public.event_committed_seats(p_series)>=v_limit then
+    return jsonb_build_object('ok',false,'code','FULL','message','名额已满，感谢关注。');
+  end if;
+
+  insert into public.registrations(series_id,user_id,email)
+  values(p_series,v_user,v_email)
+  on conflict(series_id,email) do update set status='registered',user_id=coalesce(public.registrations.user_id,excluded.user_id)
+  returning * into v_row;
+  v_reason := case when v_existing.id is not null then '已恢复报名。' else '报名成功。' end;
+  return jsonb_build_object('ok',true,'status',v_row.status,'checkin_token',v_row.checkin_token,'message',v_reason);
+end $$;
+revoke all on function public.register_for_event(bigint) from public,anon,authenticated,service_role;
+grant execute on function public.register_for_event(bigint) to authenticated;
+
+-- Ticket sales stop once every seat is committed; price authority is unchanged.
+create or replace function public.create_pending_order(p_user_id uuid, p_sku text, p_target bigint, p_amount numeric)
+ returns jsonb
+ language plpgsql
+ set search_path to ''
+as $function$
+declare v_price numeric; v_order public.orders%rowtype; v_capacity text;
+begin
+  -- Revalidate the server price snapshot while holding a shared product/configuration lock.
+  if p_sku='subscription' and p_target is null then
+    select (commerce->'subscription_price'->>'amount')::numeric into v_price from public.site_config where id=1 for share;
+  elsif p_sku='series' then
+    select price into v_price from public.series where id=p_target and type in ('collection','handbook','skill') and status='published'
+      and not exists(select 1 from public.skills k where k.legacy_series_id=series.id) for share;
+  elsif p_sku='skill' then
+    select k.price into v_price from public.skills k join public.articles a on a.id=k.id
+      where k.id=p_target and a.type='skill' and a.status='published' and k.current_release is not null for share of k,a;
+  elsif p_sku='single' then
+    select price into v_price from public.articles where id=p_target and type='blog' and series_id is null and access='paid' and status='published' for share;
+  elsif p_sku='event' then
+    select d.ticket_price,d.capacity into v_price,v_capacity from public.event_details d join public.series s on s.id=d.series_id
+      where s.id=p_target and s.type='event' and s.status='published' and d.state in ('upcoming','registering') for share of s,d;
+    if v_price is not null and coalesce(public.event_capacity_limit(v_capacity),0)>0
+      and public.event_committed_seats(p_target)>=public.event_capacity_limit(v_capacity) then
+      raise exception 'NOT_SELLABLE';
+    end if;
+  end if;
+  if v_price is null or v_price<=0 or p_amount is null or p_amount<>v_price then raise exception 'NOT_SELLABLE'; end if;
+  perform pg_advisory_xact_lock(hashtextextended('order-entitlement:' || p_user_id::text || ':' || p_sku || ':' || coalesce(p_target::text,''),0));
+  if (p_sku='skill' and public.can_use_skill(p_target,p_user_id)) or exists(select 1 from public.entitlements e where e.user_id=p_user_id and e.revoked_at is null and (e.ends_at is null or e.ends_at>now())
+    and (e.type='subscription' or (e.type=p_sku and e.target_id is not distinct from p_target))) then raise exception 'ALREADY_ENTITLED'; end if;
+  select * into v_order from public.orders where user_id=p_user_id and sku_type=p_sku
+    and target_id is not distinct from p_target and amount=v_price and status='pending' and provider='zpay'
+    order by created_at desc,id desc limit 1;
+  if found then return to_jsonb(v_order); end if;
+  insert into public.orders(user_id,sku_type,target_id,amount) values(p_user_id,p_sku,p_target,v_price) returning * into v_order;
+  return to_jsonb(v_order);
+end $function$;
+revoke all on function public.create_pending_order(uuid,text,bigint,numeric) from public,anon,authenticated,service_role;
+grant execute on function public.create_pending_order(uuid,text,bigint,numeric) to service_role;
+
+update public.app_schema_version set version='20261111000000' where id=1;
+notify pgrst,'reload schema';
+
+-- Source migration: 20261111000100_request_limits.sql
+
+-- Daily request limits for public write endpoints (escalation, inquiry).
+-- One row per bucket and site-local day; the increment is a single atomic upsert.
+create table public.request_limits (
+  bucket text not null,
+  day date not null,
+  used integer not null default 0,
+  updated_at timestamptz not null default now(),
+  primary key (bucket, day),
+  constraint request_limits_bucket_check check (length(bucket) between 1 and 200),
+  constraint request_limits_used_check check (used >= 0)
+);
+alter table public.request_limits enable row level security;
+revoke all on table public.request_limits from public, anon, authenticated, service_role;
+grant select, insert, update, delete on table public.request_limits to service_role;
+
+create function public.consume_request_limit(p_bucket text, p_day date, p_limit integer)
+returns boolean language plpgsql set search_path='' as $$
+declare v_used integer;
+begin
+  if p_bucket is null or length(p_bucket) not between 1 and 200 or p_day is null or p_limit is null or p_limit < 1 then
+    raise exception 'INVALID_LIMIT';
+  end if;
+  insert into public.request_limits(bucket, day, used) values (p_bucket, p_day, 1)
+  on conflict (bucket, day) do update set used = public.request_limits.used + 1, updated_at = now()
+    where public.request_limits.used < p_limit
+  returning used into v_used;
+  -- Old windows are not needed for decisions; keep the table bounded.
+  delete from public.request_limits where day < p_day - 7;
+  return v_used is not null;
+end $$;
+revoke all on function public.consume_request_limit(text, date, integer) from public, anon, authenticated, service_role;
+grant execute on function public.consume_request_limit(text, date, integer) to service_role;
+
+-- A service inquiry and its owner inbox item commit together or not at all.
+create function public.submit_service_inquiry(
+  p_service_slug text, p_user uuid, p_email text, p_intent text,
+  p_budget text, p_deadline date, p_links text[], p_ip text)
+returns jsonb language plpgsql set search_path='' as $$
+declare v_service public.services%rowtype; v_booking bigint;
+begin
+  if p_email is null or length(p_email) not between 3 and 320 or p_intent is null or length(p_intent) not between 10 and 2000
+    or length(coalesce(p_budget,'')) > 120 or coalesce(array_length(p_links,1),0) > 5 or length(coalesce(p_ip,'')) > 100 then
+    raise exception 'INVALID_INQUIRY';
+  end if;
+  select * into v_service from public.services where slug=p_service_slug and status='published' for share;
+  if not found then return jsonb_build_object('ok',false,'code','NOT_FOUND'); end if;
+  insert into public.bookings(service_id,user_id,email,intent,budget_range,deadline,context_links,status)
+  values(v_service.id,p_user,p_email,p_intent,nullif(p_budget,''),p_deadline,coalesce(p_links,'{}'),'inquiry')
+  returning id into v_booking;
+  insert into public.inbox_items(kind,user_id,contact,payload)
+  values('inquiry',p_user,p_email,jsonb_build_object('message',p_intent,'service',v_service.title,'slug',v_service.slug,
+    'budget_range',nullif(p_budget,''),'deadline',p_deadline,'ip',coalesce(p_ip,'unknown'),'booking_id',v_booking));
+  return jsonb_build_object('ok',true,'booking_id',v_booking,'service_title',v_service.title);
+end $$;
+revoke all on function public.submit_service_inquiry(text,uuid,text,text,text,date,text[],text) from public,anon,authenticated,service_role;
+grant execute on function public.submit_service_inquiry(text,uuid,text,text,text,date,text[],text) to service_role;
+
+update public.app_schema_version set version='20261111000100' where id=1;
+notify pgrst,'reload schema';
+
+-- Source migration: 20261111000200_user_scoped_authorities.sql
+
+-- Narrow, caller-scoped entrypoints so ordinary pages and user actions no longer
+-- need service_role. Each returns only the fields its caller may see.
+
+-- Public, transaction-anchored service reviews: no booking or personal fields.
+create function public.public_service_evaluations(p_service bigint, p_limit integer default 20)
+returns table(id bigint, rating integer, content text, created_at timestamptz)
+language sql stable security definer set search_path='' as $$
+  select e.id, e.rating, e.content, e.created_at
+  from public.evaluations e
+  join public.bookings b on b.id = e.booking_id
+  join public.services s on s.id = b.service_id
+  where b.service_id = p_service and b.status = 'settled' and s.status = 'published'
+  order by e.created_at desc, e.id desc
+  limit least(greatest(coalesce(p_limit, 20), 1), 50)
+$$;
+revoke all on function public.public_service_evaluations(bigint, integer) from public, anon, authenticated, service_role;
+grant execute on function public.public_service_evaluations(bigint, integer) to anon, authenticated, service_role;
+
+-- Only the client of a settled booking may leave its single, append-only review.
+create function public.submit_evaluation(p_booking bigint, p_rating integer, p_content text)
+returns jsonb language plpgsql security definer set search_path='' as $$
+declare v_user uuid := auth.uid(); b public.bookings%rowtype;
+begin
+  if v_user is null then return jsonb_build_object('ok', false, 'code', 'LOGIN_REQUIRED', 'message', '请登录后评价'); end if;
+  if p_rating is null or p_rating not between 1 and 5 then return jsonb_build_object('ok', false, 'code', 'INVALID', 'message', '请选择 1–5 星评分'); end if;
+  select * into b from public.bookings where id = p_booking for share;
+  if not found or b.user_id is distinct from v_user then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND', 'message', '订单不存在'); end if;
+  if b.status <> 'settled' then return jsonb_build_object('ok', false, 'code', 'NOT_SETTLED', 'message', '订单结案后才能评价'); end if;
+  insert into public.evaluations(booking_id, rating, content)
+  values (p_booking, p_rating, nullif(left(btrim(coalesce(p_content, '')), 2000), ''))
+  on conflict (booking_id) do nothing;
+  if not found then return jsonb_build_object('ok', false, 'code', 'DUPLICATE', 'message', '本订单已评价过，感谢你的反馈。'); end if;
+  return jsonb_build_object('ok', true, 'message', '感谢评价，已展示在服务页。');
+end $$;
+revoke all on function public.submit_evaluation(bigint, integer, text) from public, anon, authenticated, service_role;
+grant execute on function public.submit_evaluation(bigint, integer, text) to authenticated;
+
+-- Check-in link view: anyone holding the token sees event title and status;
+-- the registrant email is returned only to the owner.
+create function public.checkin_lookup(p_token uuid)
+returns jsonb language plpgsql stable security definer set search_path='' as $$
+declare r public.registrations%rowtype; v_title text; v_owner boolean := public.is_owner();
+begin
+  if p_token is null then return jsonb_build_object('found', false); end if;
+  select * into r from public.registrations where checkin_token = p_token;
+  if not found then return jsonb_build_object('found', false); end if;
+  select title into v_title from public.series where id = r.series_id;
+  return jsonb_build_object('found', true, 'title', v_title, 'status', r.status, 'created_at', r.created_at,
+    'is_self', r.user_id is not null and r.user_id = auth.uid(), 'has_account', r.user_id is not null)
+    || case when v_owner then jsonb_build_object('email', r.email) else '{}'::jsonb end;
+end $$;
+revoke all on function public.checkin_lookup(uuid) from public, anon, authenticated, service_role;
+grant execute on function public.checkin_lookup(uuid) to anon, authenticated;
+
+update public.app_schema_version set version='20261111000200' where id=1;
+notify pgrst,'reload schema';
+
+-- Source migration: 20261111120000_navigation_items.sql
+
+set local lock_timeout='5s';
+set local statement_timeout='30s';
+
+-- One owner-managed source for custom sidebar entries: external links, custom
+-- pages, albums and code sections. Built-in navigation stays in application code.
+create table public.nav_items (
+  id bigint generated always as identity primary key,
+  kind text not null check (kind in ('external','page','series','section')),
+  label text not null check (length(btrim(label)) between 1 and 40),
+  icon text not null default 'link' check (icon ~ '^[a-z][a-z0-9-]{0,39}$'),
+  url text check (url is null or (length(url) <= 2000 and url ~ '^https://[^[:space:]]+$')),
+  page_id bigint references public.custom_pages(id) on delete cascade,
+  series_id bigint references public.series(id) on delete cascade,
+  section text check (section is null or section ~ '^[a-z][a-z0-9-]{1,39}$'),
+  access text not null default 'public' check (access in ('public','login','subscriber')),
+  enabled boolean not null default true,
+  sort_order integer not null default 0 check (sort_order between -10000 and 10000),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint nav_items_target check (
+    (kind = 'external' and url is not null and page_id is null and series_id is null and section is null) or
+    (kind = 'page' and page_id is not null and url is null and series_id is null and section is null) or
+    (kind = 'series' and series_id is not null and url is null and page_id is null and section is null) or
+    (kind = 'section' and section is not null and url is null and page_id is null and series_id is null)),
+  constraint nav_items_access_scope check (kind = 'section' or access = 'public')
+);
+create unique index nav_items_page_key on public.nav_items(page_id) where page_id is not null;
+create unique index nav_items_series_key on public.nav_items(series_id) where series_id is not null;
+create unique index nav_items_section_key on public.nav_items(section) where section is not null;
+create index nav_items_order on public.nav_items(sort_order, id);
+
+alter table public.nav_items enable row level security;
+create policy nav_items_owner_all on public.nav_items as permissive for all to authenticated
+  using ((select public.is_owner())) with check ((select public.is_owner()));
+revoke all on table public.nav_items from public, anon, authenticated, service_role;
+grant select, insert, update, delete on table public.nav_items to authenticated;
+grant select, insert, update, delete on table public.nav_items to service_role;
+revoke all on sequence public.nav_items_id_seq from public, anon, authenticated, service_role;
+
+-- Existing sidebar choices are copied into the new source with their labels and order.
+insert into public.nav_items(kind, label, icon, series_id, sort_order)
+select 'series', left(coalesce(nullif(btrim(s.nav_label), ''), s.title), 40),
+  case s.type when 'event' then 'calendar' when 'skill' then 'wrench' else 'book-open' end,
+  s.id, s.nav_order
+from public.series s where s.nav_enabled;
+insert into public.nav_items(kind, label, icon, page_id, sort_order)
+select 'page', left(coalesce(nullif(btrim(p.nav_label), ''), p.title), 40), 'file-text',
+  p.id, greatest(least(p.nav_order, 10000), -10000)
+from public.custom_pages p where p.placement = 'nav';
+-- The legacy columns (series.nav_enabled/nav_label/nav_order, custom_pages.placement='nav')
+-- keep their values so the upgrade preserves existing data and an application rollback still
+-- works. The application no longer reads or writes them; nav_items is the only source.
+
+-- Public projection: enabled entries whose targets are readable by everyone.
+-- Hidden targets, owner metadata and timestamps never leave this function.
+create function public.public_navigation()
+returns table(id bigint, kind text, label text, icon text, url text, page_slug text,
+  series_slug text, series_type text, section text, access text)
+language sql stable security definer set search_path='' as $$
+  select n.id, n.kind, n.label, n.icon, n.url, p.slug, s.slug, s.type, n.section, n.access
+  from public.nav_items n
+  left join public.custom_pages p on p.id = n.page_id
+  left join public.series s on s.id = n.series_id
+  where n.enabled
+    and (n.kind <> 'page' or p.status = 'published')
+    and (n.kind <> 'series' or s.status in ('published','paused'))
+  order by n.sort_order, n.id
+  limit 100
+$$;
+revoke all on function public.public_navigation() from public, anon, authenticated, service_role;
+grant execute on function public.public_navigation() to anon, authenticated, service_role;
+
+create function public.nav_items_version() returns text
+language sql stable security invoker set search_path='' as $$
+  select coalesce(md5(string_agg(n.id::text || ':' || n.updated_at::text, ',' order by n.id)), 'empty')
+  from public.nav_items n
+$$;
+revoke all on function public.nav_items_version() from public, anon, authenticated, service_role;
+grant execute on function public.nav_items_version() to authenticated, service_role;
+
+-- The admin page saves the whole ordered list as one optimistic transaction.
+create function public.save_nav_items(p_expected text, p_items jsonb) returns jsonb
+language plpgsql security invoker set search_path='' as $$
+declare item jsonb; position integer := 0;
+begin
+  if not public.is_owner() then raise exception 'OWNER_REQUIRED'; end if;
+  perform pg_advisory_xact_lock(hashtextextended('nav-items', 0));
+  if public.nav_items_version() is distinct from p_expected then
+    return jsonb_build_object('ok', false, 'message', '导航已被更新，请刷新后重新核对。');
+  end if;
+  if jsonb_typeof(p_items) is distinct from 'array' or jsonb_array_length(p_items) > 50
+    or exists(select 1 from jsonb_array_elements(p_items) x where jsonb_typeof(x) <> 'object') then
+    raise exception 'INVALID_NAVIGATION';
+  end if;
+  delete from public.nav_items where true;
+  for item in select value from jsonb_array_elements(p_items) loop
+    insert into public.nav_items(kind, label, icon, url, page_id, series_id, section, access, enabled, sort_order)
+    values (item->>'kind', btrim(item->>'label'), coalesce(item->>'icon', 'link'), nullif(item->>'url', ''),
+      nullif(item->>'page_id', '')::bigint, nullif(item->>'series_id', '')::bigint, nullif(item->>'section', ''),
+      coalesce(item->>'access', 'public'), coalesce((item->>'enabled')::boolean, true), position * 10);
+    position := position + 1;
+  end loop;
+  return jsonb_build_object('ok', true, 'message', '导航已保存。', 'version', public.nav_items_version());
+end $$;
+revoke all on function public.save_nav_items(text, jsonb) from public, anon, authenticated, service_role;
+grant execute on function public.save_nav_items(text, jsonb) to authenticated;
+
+-- Album settings no longer carry sidebar fields.
+create or replace function public.save_series_settings(p_id bigint, p_expected timestamptz, p_values jsonb)
+returns jsonb language plpgsql security invoker set search_path='' as $$
+declare s public.series%rowtype; readme bigint;
+begin
+ if not public.is_owner() then raise exception 'OWNER_REQUIRED'; end if;
+ select * into s from public.series where id=p_id for update;
+ if s.id is null or s.status='archived' or s.updated_at is distinct from p_expected then
+   return jsonb_build_object('ok',false,'message','专辑已更新或归档，请刷新后重新核对。');
+ end if;
+ if jsonb_typeof(p_values)<>'object' or length(trim(p_values->>'title')) not between 1 and 200
+   or length(coalesce(p_values->>'task',''))>300
+   or jsonb_typeof(p_values->'tags')<>'array' or jsonb_array_length(p_values->'tags')>20
+   or jsonb_typeof(p_values->'audiences')<>'array' or jsonb_array_length(p_values->'audiences')>20
+   or exists(select 1 from jsonb_array_elements(p_values->'tags'||p_values->'audiences') x where jsonb_typeof(x)<>'string' or length(x#>>'{}')>50)
+   or (s.type<>'event' and (p_values->>'price' !~ '^[0-9]{1,6}(\.[0-9]{1,2})?$')) then raise exception 'INVALID_SETTINGS'; end if;
+ readme:=nullif(p_values->>'readme_article_id','')::bigint;
+ if readme is not null and not exists(select 1 from public.articles where id=readme and series_id=s.id and access='public' and status in ('published','paused')) then
+   return jsonb_build_object('ok',false,'message','README 必须是本专辑已发布的公开章节。');
+ end if;
+ if s.status<>'draft' and readme is null then return jsonb_build_object('ok',false,'message','已上架专辑需要保留公开 README。'); end if;
+ update public.series set title=trim(p_values->>'title'),task=nullif(p_values->>'task',''),
+ tags=array(select jsonb_array_elements_text(p_values->'tags')),audiences=array(select jsonb_array_elements_text(p_values->'audiences')),
+ featured=(p_values->>'featured')::boolean,price=case when s.type='event' then s.price else (p_values->>'price')::numeric end,
+ readme_article_id=readme where id=s.id;
+ return jsonb_build_object('ok',true,'message','专辑设置已保存；正文和上架状态未改变。');
+end $$;
+
+create or replace function public.prepare_starter_content(p_hash text,p_html text,p_articles jsonb) returns jsonb
+language plpgsql set search_path='' as $$
+declare job public.starter_imports%rowtype; parent public.series%rowtype; page public.custom_pages%rowtype;
+ item public.articles%rowtype; descriptor jsonb; objects jsonb:='[]'::jsonb;
+begin
+ perform pg_advisory_xact_lock(hashtextextended('starter-content-v1',0));
+ select * into job from public.starter_imports where id='getting-started-v1';
+ if found then
+   if job.template_hash<>p_hash then raise exception 'STARTER_TEMPLATE_CHANGED'; end if;
+   return to_jsonb(job)-'objects';
+ end if;
+ if p_hash is null or p_hash !~ '^[a-f0-9]{64}$' or p_html is null or length(p_html)>100000
+   or coalesce(jsonb_typeof(p_articles),'')<>'array' or jsonb_array_length(p_articles)<>8 then raise exception 'INVALID_STARTER_TEMPLATE'; end if;
+ if exists(select 1 from public.publish_requests where client_request_id ~ '^starter_v1_[0-7]$')
+   or exists(select 1 from public.series where slug='getting-started') or exists(select 1 from public.custom_pages where slug='pricing')
+   or exists(select 1 from public.articles where slug in(select value->>'slug' from jsonb_array_elements(p_articles)))
+   or exists(select 1 from public.content_files where article_slug in(select value->>'slug' from jsonb_array_elements(p_articles))) then raise exception 'STARTER_SLUG_CONFLICT'; end if;
+ insert into public.series(slug,type,title,task,price,status)
+ values('getting-started','handbook','使用指南','从部署到发布，了解本站系统的配置与日常使用。',0,'draft') returning * into parent;
+ insert into public.custom_pages(slug,title,description,html,status,placement,nav_label,nav_order)
+ values('pricing','收费方案','了解阅读、订阅、内容购买与服务合作。',p_html,'draft','none','收费方案',90) returning * into page;
+ for descriptor in select value from jsonb_array_elements(p_articles) loop
+   if descriptor->>'slug' is null or descriptor->>'slug' !~ '^[a-z0-9][a-z0-9-]{1,119}$'
+     or coalesce(length(descriptor->>'title'),0) not between 1 and 200
+     or coalesce(descriptor->>'content_hash','') !~ '^[a-f0-9]{64}$' then raise exception 'INVALID_STARTER_ARTICLE'; end if;
+   insert into public.articles(slug,series_id,type,title,access,status,sort_order)
+   values(descriptor->>'slug',parent.id,'chapter',descriptor->>'title','public','draft',jsonb_array_length(objects)) returning * into item;
+   objects:=objects||jsonb_build_array(jsonb_build_object('id',item.id,'slug',item.slug,'updated_at',item.updated_at,'content_hash',descriptor->>'content_hash'));
+ end loop;
+ insert into public.starter_imports(id,template_hash,objects) values('getting-started-v1',p_hash,
+   jsonb_build_object('series_id',parent.id,'series_updated_at',parent.updated_at,'page_id',page.id,'page_updated_at',page.updated_at,'articles',objects)) returning * into job;
+ return to_jsonb(job)-'objects';
+end $$;
+revoke all on function public.prepare_starter_content(text,text,jsonb) from public,anon,authenticated;
+grant execute on function public.prepare_starter_content(text,text,jsonb) to service_role;
+
+create or replace function public.commit_starter_publication(p_request_id text,p_payload jsonb) returns jsonb
+language plpgsql set search_path='' as $$
+declare job public.starter_imports%rowtype; descriptor jsonb; item public.articles%rowtype;
+ parent public.series%rowtype; page public.custom_pages%rowtype; result jsonb; step integer;
+begin
+ select * into job from public.starter_imports where id='getting-started-v1' for update;
+ if not found then raise exception 'STARTER_NOT_PREPARED'; end if;
+ select response into result from public.publish_requests where client_request_id=p_request_id;
+ if found then return result; end if;
+ step:=job.published_count;
+ if job.completed or step>=8 or p_request_id<>'starter_v1_'||step::text then raise exception 'STARTER_STEP_CHANGED'; end if;
+ descriptor:=job.objects->'articles'->step;
+ select * into item from public.articles where id=(descriptor->>'id')::bigint for update;
+ if not found or item.updated_at is distinct from (descriptor->>'updated_at')::timestamptz
+   or item.status<>'draft' or item.series_id<>(job.objects->>'series_id')::bigint
+   or p_payload->'frontmatter'->>'slug'<>item.slug or p_payload->'frontmatter'->>'access'<>'public'
+   or p_payload->'frontmatter'->>'type'<>'chapter' or p_payload->'frontmatter'->>'series_slug'<>'getting-started'
+   or p_payload->>'content_hash' is distinct from descriptor->>'content_hash' then raise exception 'STARTER_CONTENT_CHANGED'; end if;
+ if step=7 then
+   select * into parent from public.series where id=(job.objects->>'series_id')::bigint for update;
+   select * into page from public.custom_pages where id=(job.objects->>'page_id')::bigint for update;
+   if parent.updated_at is distinct from (job.objects->>'series_updated_at')::timestamptz or parent.status<>'draft'
+     or page.updated_at is distinct from (job.objects->>'page_updated_at')::timestamptz or page.status<>'draft' then raise exception 'STARTER_CONTENT_CHANGED'; end if;
+ end if;
+ result:=public.commit_publication(p_request_id,p_payload||jsonb_build_object('expected_updated_at',item.updated_at));
+ if result->>'status'='blocked' or jsonb_typeof(result->'article') is distinct from 'object' then return result; end if;
+ select * into item from public.articles where id=item.id;
+ job.objects:=jsonb_set(job.objects,array['articles',step::text,'updated_at'],to_jsonb(item.updated_at));
+ if step=7 then
+   if (select count(*) from public.articles a where a.id in(select (value->>'id')::bigint from jsonb_array_elements(job.objects->'articles'))
+     and a.series_id=parent.id and a.type='chapter' and a.status='published' and a.access='public'
+     and a.updated_at=(select (value->>'updated_at')::timestamptz from jsonb_array_elements(job.objects->'articles') where (value->>'id')::bigint=a.id))<>8 then raise exception 'STARTER_CONTENT_CHANGED'; end if;
+   update public.series set readme_article_id=(job.objects->'articles'->0->>'id')::bigint,status='published' where id=parent.id;
+   update public.custom_pages set status='published' where id=page.id;
+   insert into public.nav_items(kind,label,icon,page_id,sort_order) values('page','收费方案','credit-card',page.id,90)
+     on conflict (page_id) where page_id is not null do nothing;
+   insert into public.nav_items(kind,label,icon,series_id,sort_order) values('series','使用指南','book-open',parent.id,100)
+     on conflict (series_id) where series_id is not null do nothing;
+ end if;
+ update public.starter_imports set published_count=step+1,completed=(step=7),objects=job.objects,updated_at=now() where id=job.id;
+ return result;
+end $$;
+revoke all on function public.commit_starter_publication(text,jsonb) from public,anon,authenticated;
+grant execute on function public.commit_starter_publication(text,jsonb) to service_role;
+
+-- Owner export keeps the navigation list with the rest of the site configuration.
+create or replace function public.export_site_snapshot(p_include_media boolean,p_include_skills boolean) returns jsonb
+language sql stable security invoker set search_path='' as $$
+ with saved as materialized (select public.export_site_snapshot(p_include_media) value),
+ extended as (select case when p_include_skills then saved.value || jsonb_build_object('rows',
+   (saved.value->'rows') || jsonb_build_object(
+     'skills',(select coalesce(jsonb_agg(to_jsonb(s) order by s.id),'[]'::jsonb) from public.skills s),
+     'skill_releases',(select coalesce(jsonb_agg(to_jsonb(s) order by s.id),'[]'::jsonb) from public.skill_releases s)))
+ else saved.value end value from saved)
+ select jsonb_set(extended.value,'{rows,nav_items}',
+   (select coalesce(jsonb_agg(to_jsonb(n) order by n.id),'[]'::jsonb) from public.nav_items n),true) from extended;
+$$;
+revoke all on function public.export_site_snapshot(boolean,boolean) from public,anon,authenticated;
+grant execute on function public.export_site_snapshot(boolean,boolean) to service_role;
+
+update public.app_schema_version set version='20261111120000' where id=1;
+notify pgrst,'reload schema';
+
+-- Source migration: 20261112090000_navigation_groups.sql
+
+set local lock_timeout='5s';
+set local statement_timeout='30s';
+
+-- Two-level navigation: a `group` entry is a collapsible parent without its own
+-- target; its children are ordinary entries (page, album, code section, link).
+-- Only one level of nesting: a group is always top-level and children are never groups.
+alter table public.nav_items add column parent_id bigint references public.nav_items(id) on delete cascade;
+alter table public.nav_items drop constraint nav_items_kind_check;
+alter table public.nav_items add constraint nav_items_kind_check
+  check (kind in ('external','page','series','section','group'));
+alter table public.nav_items drop constraint nav_items_target;
+alter table public.nav_items add constraint nav_items_target check (
+  (kind = 'external' and url is not null and page_id is null and series_id is null and section is null) or
+  (kind = 'page' and page_id is not null and url is null and series_id is null and section is null) or
+  (kind = 'series' and series_id is not null and url is null and page_id is null and section is null) or
+  (kind = 'section' and section is not null and url is null and page_id is null and series_id is null) or
+  (kind = 'group' and url is null and page_id is null and series_id is null and section is null));
+alter table public.nav_items add constraint nav_items_group_top_level check (kind <> 'group' or parent_id is null);
+create index nav_items_parent on public.nav_items(parent_id) where parent_id is not null;
+
+-- A parent must be a top-level group; a group with children cannot change kind.
+create function public.guard_nav_item_parent() returns trigger
+language plpgsql security invoker set search_path='' as $$
+begin
+ if new.parent_id is not null and not exists(
+   select 1 from public.nav_items g where g.id = new.parent_id and g.kind = 'group' and g.parent_id is null) then
+   raise exception 'NAV_PARENT_INVALID';
+ end if;
+ if tg_op = 'UPDATE' and old.kind = 'group' and new.kind <> 'group'
+   and exists(select 1 from public.nav_items c where c.parent_id = new.id) then
+   raise exception 'NAV_PARENT_INVALID';
+ end if;
+ return new;
+end $$;
+create trigger nav_item_parent before insert or update of parent_id, kind on public.nav_items
+ for each row execute function public.guard_nav_item_parent();
+revoke all on function public.guard_nav_item_parent() from public,anon,authenticated,service_role;
+
+-- Public projection now carries the parent; children of a disabled group stay hidden.
+-- Groups are returned when enabled; the application hides groups without visible children.
+drop function public.public_navigation();
+create function public.public_navigation()
+returns table(id bigint, parent_id bigint, kind text, label text, icon text, url text, page_slug text,
+  series_slug text, series_type text, section text, access text)
+language sql stable security definer set search_path='' as $$
+  select n.id, n.parent_id, n.kind, n.label, n.icon, n.url, p.slug, s.slug, s.type, n.section, n.access
+  from public.nav_items n
+  left join public.nav_items g on g.id = n.parent_id
+  left join public.custom_pages p on p.id = n.page_id
+  left join public.series s on s.id = n.series_id
+  where n.enabled
+    and (n.parent_id is null or g.enabled)
+    and (n.kind <> 'page' or p.status = 'published')
+    and (n.kind <> 'series' or s.status in ('published','paused'))
+  order by n.sort_order, n.id
+  limit 100
+$$;
+revoke all on function public.public_navigation() from public, anon, authenticated, service_role;
+grant execute on function public.public_navigation() to anon, authenticated, service_role;
+
+-- The saved list stays flat and ordered; `child: true` attaches an entry to the
+-- nearest preceding group. A top-level entry ends the current group.
+create or replace function public.save_nav_items(p_expected text, p_items jsonb) returns jsonb
+language plpgsql security invoker set search_path='' as $$
+declare item jsonb; position integer := 0; current_group bigint; inserted bigint; is_child boolean;
+begin
+  if not public.is_owner() then raise exception 'OWNER_REQUIRED'; end if;
+  perform pg_advisory_xact_lock(hashtextextended('nav-items', 0));
+  if public.nav_items_version() is distinct from p_expected then
+    return jsonb_build_object('ok', false, 'message', '导航已被更新，请刷新后重新核对。');
+  end if;
+  if jsonb_typeof(p_items) is distinct from 'array' or jsonb_array_length(p_items) > 50
+    or exists(select 1 from jsonb_array_elements(p_items) x where jsonb_typeof(x) <> 'object') then
+    raise exception 'INVALID_NAVIGATION';
+  end if;
+  delete from public.nav_items where true;
+  for item in select value from jsonb_array_elements(p_items) loop
+    is_child := coalesce((item->>'child')::boolean, false);
+    if is_child and (current_group is null or item->>'kind' = 'group') then
+      raise exception 'INVALID_NAVIGATION';
+    end if;
+    insert into public.nav_items(kind, label, icon, url, page_id, series_id, section, access, enabled, sort_order, parent_id)
+    values (item->>'kind', btrim(item->>'label'), coalesce(item->>'icon', 'link'), nullif(item->>'url', ''),
+      nullif(item->>'page_id', '')::bigint, nullif(item->>'series_id', '')::bigint, nullif(item->>'section', ''),
+      coalesce(item->>'access', 'public'), coalesce((item->>'enabled')::boolean, true), position * 10,
+      case when is_child then current_group end)
+    returning id into inserted;
+    if item->>'kind' = 'group' then current_group := inserted;
+    elsif not is_child then current_group := null;
+    end if;
+    position := position + 1;
+  end loop;
+  return jsonb_build_object('ok', true, 'message', '导航已保存。', 'version', public.nav_items_version());
+end $$;
+revoke all on function public.save_nav_items(text, jsonb) from public, anon, authenticated, service_role;
+grant execute on function public.save_nav_items(text, jsonb) to authenticated;
+
+update public.app_schema_version set version='20261112090000' where id=1;
+notify pgrst,'reload schema';
+
 
 commit;

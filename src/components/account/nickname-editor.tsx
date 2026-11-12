@@ -22,7 +22,7 @@ export function NicknameEditor({ current }: { current: string | null }) {
   }
   return (
     <form action={action} className="flex flex-wrap items-center gap-2">
-      <Input name="display_name" defaultValue={current ?? ""} maxLength={40} placeholder="输入昵称（留空清除）" className="h-8 w-52" autoFocus />
+      <Input name="display_name" aria-label="昵称" defaultValue={current ?? ""} maxLength={40} placeholder="输入昵称（留空清除）" className="h-8 w-52" autoFocus />
       <Button size="sm" disabled={pending}>{pending ? "保存中…" : "保存"}</Button>
       <Button size="sm" variant="ghost" type="button" onClick={() => setEditing(false)}>取消</Button>
       {state.message && <p role="status" className="w-full text-xs text-muted-foreground">{state.message}</p>}

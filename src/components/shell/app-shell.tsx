@@ -32,6 +32,7 @@ import {
 import { ReadingShellProvider, useReadingShell } from "@/components/reading/reading-shell";
 import { SiteFooter } from "@/components/shell/site-footer";
 import { cn } from "@/lib/utils";
+import type { NavEntry } from "@/lib/navigation/types";
 
 /**
  * 全站统一三栏骨架（页面契约 §2 / Design Tokens §4）：
@@ -45,14 +46,13 @@ export interface AppShellProps {
   owner?: boolean;
   user?: { email: string } | null;
   site: { name: string; tagline: string | null; logoUrl: string | null };
-  navPages?: { href: string; label: string }[];
+  navItems?: NavEntry[];
   subscribe: {
     enabled: boolean;
     priceText: string | null;
     href: string;
     subscribedDays?: number | null;
   };
-  avatarModel: string | null;
   avatarEnabled: boolean;
   avatarAnonymous: boolean;
   turnstileSiteKey: string | null;
@@ -70,7 +70,6 @@ export interface AppShellProps {
 export function AppShell({
   site,
   subscribe,
-  avatarModel,
   avatarEnabled,
   avatarAnonymous,
   turnstileSiteKey,
@@ -78,7 +77,7 @@ export function AppShell({
   children,
   owner = false,
   user = null,
-  navPages = [],
+  navItems = [],
 }: AppShellProps) {
   const pathname = usePathname();
   const admin = pathname === "/admin" || pathname.startsWith("/admin/");
@@ -91,7 +90,7 @@ export function AppShell({
     subscribe,
     owner,
     user,
-    navPages,
+    navItems,
   };
   if (bare)
     return (
@@ -102,9 +101,8 @@ export function AppShell({
     );
 
   return (
-    <AdminPanelProvider key={pathname}>
+    <AdminPanelProvider>
       <RightPanelProvider
-        avatarModel={avatarModel}
         avatarEnabled={showAvatar}
         avatarAnonymous={avatarAnonymous}
         turnstileSiteKey={turnstileSiteKey}
@@ -189,7 +187,7 @@ function ShellLayout({
           <div className="sticky top-0">
             <NavigationRail
               onDirectory={openDirectory}
-              navPages={navProps.navPages ?? []}
+              navItems={navProps.navItems ?? []}
             />
           </div>
         </aside>
@@ -198,6 +196,7 @@ function ShellLayout({
       {/* 中栏：顶栏（<1024）+ 主体 + footer */}
       <div className="flex min-h-dvh min-w-0 flex-col">
         <header
+          data-shell-header
           className={cn(
             "opc-glass sticky top-0 z-30 flex items-center gap-3 border-b px-4 py-3",
             admin ? "lg:hidden" : "xl:hidden",

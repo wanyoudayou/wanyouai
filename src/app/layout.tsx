@@ -9,7 +9,9 @@ import { ThemeProvider } from "@/components/theme/theme-provider";
 import { getAdminIdentity } from "@/lib/admin/session";
 import { getUserIdentity } from "@/lib/account/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getFooterPages, getNavPages } from "@/lib/custom-pages/get-page";
+import { getFooterPages } from "@/lib/custom-pages/get-page";
+import { getNavigation } from "@/lib/navigation/public";
+import { navLinks } from "@/lib/navigation/types";
 import { loadTurnstilePublic } from "@/lib/turnstile-config";
 import "./globals.css";
 
@@ -52,7 +54,7 @@ export default async function RootLayout({
 }: {
   children: ReactNode;
 }) {
-  const [site, owner, user, navPages, footerPages, turnstile] = await Promise.all([
+  const [site, owner, user, navItems, footerPages, turnstile] = await Promise.all([
     getSiteConfig(),
     getAdminIdentity()
       .then((identity) => identity.owner)
@@ -60,7 +62,7 @@ export default async function RootLayout({
     getUserIdentity()
       .then((identity) => identity.user)
       .catch(() => null),
-    getNavPages().catch(() => []),
+    getNavigation().catch(() => []),
     getFooterPages().catch(() => []),
     createSupabaseServerClient().then(client => loadTurnstilePublic(client)).catch(() => null),
   ]);
@@ -69,7 +71,7 @@ export default async function RootLayout({
   const configuredPage = site.commerce.subscribePage;
   const subscribeHref = configuredPage
     ? `/p/${configuredPage}#pricing`
-    : navPages.some((page) => page.href === "/p/pricing")
+    : navLinks(navItems).some((item) => item.href === "/p/pricing")
       ? "/p/pricing#pricing"
       : site.identity.showSubscriptionCard
         ? "/card#pricing"
@@ -100,14 +102,13 @@ export default async function RootLayout({
               tagline: site.tagline,
               logoUrl: site.identity.logoUrl,
             }}
-            navPages={navPages}
+            navItems={navItems}
             subscribe={{
               enabled: site.commerce.paymentEnabled,
               priceText: subscribePriceText,
               href: subscribeHref,
               subscribedDays,
             }}
-            avatarModel={site.avatar.model}
             avatarEnabled={site.avatar.enabled}
             avatarAnonymous={site.avatar.anonymousEntry}
             turnstileSiteKey={turnstile?.enabled ? turnstile.siteKey : null}

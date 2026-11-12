@@ -30,8 +30,8 @@ export function CardIdentityAside({ card, cardJsonUrl }: { card: CardPanelData; 
       <div className="space-y-3">
         <h1 className="text-2xl leading-snug font-medium">{card.siteName}</h1>
         <ul className="space-y-1.5">
-          {facts.map(({ Icon, text }) => (
-            <li key={text} className="flex items-center gap-2 text-sm text-muted-foreground">
+          {facts.map(({ Icon, text }, index) => (
+            <li key={`${index}-${text}`} className="flex items-center gap-2 text-sm text-muted-foreground">
               <Icon className="size-4 shrink-0" aria-hidden />
               {text}
             </li>

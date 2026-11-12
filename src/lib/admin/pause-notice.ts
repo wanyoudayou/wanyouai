@@ -7,7 +7,8 @@ import { escapeHtml, mailerFromEnv, renderMailHtml } from "@/lib/mailer";
  * 语义：停售 = 停售不停读 + 已购权益保留 3 个月；停售动作成功即向直接购买者发本通知。
  * 归档不再发邮件（时间闸满 3 个月后静默归档）。
  * 通知范围：只通知直接购买者（series/single 权益持有者），不通知全站订阅者。
- * 幂等：email_sends 按 `kind:id:YYYYMMDD` 去重；同日重复停售不重复通知，跨日重新停售会再次通知（新保留期）。
+ * 幂等：按收件人在 email_sends 先占位（`kind:id:YYYYMMDD:user`）再发送；同日重复或并发触发只补发尚未通知者，
+ * 发送失败释放占位以便重试；跨日重新停售会再次通知（新保留期）。
  */
 export async function sendPauseNotice(kind: "article" | "series", id: number): Promise<{ notified: number; alreadySent: boolean; mailerConfigured: boolean }> {
   const service = createSupabaseServiceClient();
@@ -27,9 +28,6 @@ export async function sendPauseNotice(kind: "article" | "series", id: number): P
   }
   // The old and new management entrypoints refer to the same paused product.
   const refId = `${canonicalKind}:${canonicalId}:${day}`;
-  const { data: existing, error: noticeError } = await service.from("email_sends").select("id").eq("kind", "pause_notice").eq("ref_id", refId).maybeSingle();
-  if (noticeError) throw new Error("停售通知记录暂时无法读取");
-  if (existing) return { notified: 0, alreadySent: true, mailerConfigured: true };
   const holders = [] as { user_id: string; starts_at: string; ends_at: string | null }[];
   for (const target of targets) {
     const result = await service.from("entitlements").select("user_id,starts_at,ends_at").eq("type", target.type).eq("target_id", target.id).is("revoked_at", null);
@@ -45,17 +43,28 @@ export async function sendPauseNotice(kind: "article" | "series", id: number): P
     return { notified: 0, alreadySent: false, mailerConfigured: false };
   }
 
-  const { data: site } = await service.from("site_config").select("site_name").limit(1).maybeSingle();
-  const siteName: string = site?.site_name || "万有AI";
+  const { data: site } = await service.from("site_config").select("site_name,identity").limit(1).maybeSingle();
+  const siteName: string = site?.site_name || "站点";
+  const timeZone = typeof site?.identity?.timezone === "string" ? site.identity.timezone : "Asia/Shanghai";
   const siteUrl = (process.env.SITE_URL ?? "").replace(/\/$/, "");
   const ctaUrl = `${siteUrl}/me`;
-  const retainUntil = new Date(Date.now() + 92 * 86_400_000).toLocaleDateString("zh-CN");
+  let retainUntil: string;
+  try { retainUntil = new Intl.DateTimeFormat("zh-CN", { timeZone, dateStyle: "medium" }).format(new Date(Date.now() + 92 * 86_400_000)); }
+  catch { retainUntil = new Date(Date.now() + 92 * 86_400_000).toISOString().slice(0, 10); }
 
   const sentTo: string[] = [];
+  let alreadyNotified = 0;
   for (const holder of active) {
     const { data: authData } = await service.auth.admin.getUserById(holder.user_id);
     const email = authData.user?.email;
     if (!email) continue;
+    // 先占位再发送：(kind, ref_id) 唯一约束保证同一收件人同日只发一次，并发调用也只有一方发信。
+    const recipientRef = `${refId}:${holder.user_id}`;
+    const claim = await service.from("email_sends").insert({ kind: "pause_notice", ref_id: recipientRef, sent_to: email, meta: { title, retain_until: retainUntil } });
+    if (claim.error) {
+      if (claim.error.code === "23505") { alreadyNotified += 1; continue; }
+      throw new Error("停售通知记录暂时无法写入");
+    }
     try {
       await mailer.send({
         to: email,
@@ -72,11 +81,10 @@ export async function sendPauseNotice(kind: "article" | "series", id: number): P
       });
       sentTo.push(email);
     } catch {
-      console.error("[mail] 停售通知发送失败");
+      // 释放占位，允许站主稍后重试停售通知时补发。
+      await service.from("email_sends").delete().eq("kind", "pause_notice").eq("ref_id", recipientRef);
+      console.error("[mail] 停售通知发送失败（已释放占位，可重试）");
     }
   }
-  if (sentTo.length > 0) {
-    await service.from("email_sends").insert({ kind: "pause_notice", ref_id: refId, sent_to: sentTo.join(","), meta: { title, holders: active.length, retain_until: retainUntil } });
-  }
-  return { notified: sentTo.length, alreadySent: false, mailerConfigured: true };
+  return { notified: sentTo.length, alreadySent: sentTo.length === 0 && alreadyNotified > 0, mailerConfigured: true };
 }

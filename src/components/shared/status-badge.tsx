@@ -1,5 +1,5 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { CheckIcon, LockIcon } from "lucide-react";
+import { CheckIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,11 @@ const statusBadgeVariants = cva("gap-1", {
       "event-registering": "border-success/30 bg-transparent text-success",
       "event-ended": "border-transparent bg-muted text-muted-foreground",
       paused: "border-warning/30 bg-transparent text-warning",
+      // 通用语义（后台检查、诊断等非业务状态），避免借用权限/商品配色。
+      info: "border-info/30 bg-transparent text-info",
+      success: "border-success/30 bg-transparent text-success",
+      warning: "border-warning/30 bg-transparent text-warning",
+      danger: "border-destructive/40 bg-transparent text-destructive",
     },
   },
   defaultVariants: { tone: "free" },
@@ -51,15 +56,6 @@ export function AccessBadge({ access }: { access: ArticleAccess }) {
     <StatusBadge tone={ACCESS_BADGE_TONE[access]}>
       {ACCESS_BADGE_LABEL[access]}
     </StatusBadge>
-  );
-}
-
-export function LockBadge() {
-  return (
-    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-      <LockIcon className="size-3" aria-hidden />
-      锁定
-    </span>
   );
 }
 

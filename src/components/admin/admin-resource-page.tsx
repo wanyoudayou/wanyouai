@@ -33,7 +33,6 @@ const COLUMNS: Record<ResourceKind, AdminColumn[]> = {
     { key: "kind", label: "类型" },
     { key: "status", label: "状态" },
     { key: "chapters", label: "章节（不含介绍）" },
-    { key: "nav", label: "侧栏" },
     { key: "updated", label: "最近编辑" },
   ],
   pages: [
@@ -79,19 +78,36 @@ const COLUMNS: Record<ResourceKind, AdminColumn[]> = {
   ],
 };
 
+/** 同一数据资源的固定子视图，例如“专辑”资源下的手册与活动。 */
+export type ResourceScope = {
+  types: readonly string[];
+  title: string;
+  description: string;
+  path: string;
+  create?: { label: string; href: string };
+};
+
 export async function AdminResourcePage({
   resource,
   params,
+  scope,
+  embedded = false,
 }: {
   resource: ResourceKind;
   params: RawListQuery;
+  scope?: ResourceScope;
+  /** 嵌在详情页内：不重复外层页边距与最大宽度。 */
+  embedded?: boolean;
 }) {
   if (!(await getAdminIdentity()).owner) redirect("/admin");
   const [data, site] = await Promise.all([
-    getAdminResourcePage(resource, params),
+    getAdminResourcePage(resource, params, scope?.types),
     getSiteConfig(),
   ]);
   const spec = RESOURCES[resource];
+  const types = (spec.types as readonly string[]).filter(
+    (type) => !scope || scope.types.includes(type),
+  );
   const date = (value: unknown) =>
     typeof value === "string" && Number.isFinite(Date.parse(value))
       ? new Intl.DateTimeFormat("zh-CN", {
@@ -107,7 +123,7 @@ export async function AdminResourcePage({
           Number(value),
           site.commerce.subscriptionPrice?.currency ?? "CNY",
         );
-  const returnTo = `${resource === "bookings" ? "/admin/orders" : `/admin/${resource}`}${listQueryString(data.query)}`;
+  const returnTo = `${scope?.path ?? (resource === "bookings" ? "/admin/orders" : `/admin/${resource}`)}${listQueryString(data.query)}`;
   const rows = data.items.map((row: ListRecord): AdminTableRow => {
     const id = text(row.id);
     const base = {
@@ -176,10 +192,9 @@ export async function AdminResourcePage({
           ...base.cells,
           kind: label(row.type),
           chapters: text(row.chapter_count),
-          nav: row.nav_enabled ? text(row.nav_label || row.title) : "未显示",
         },
         actions: [
-          { label: "管理专辑", href: base.href },
+          { label: "管理", href: base.href },
           ...(["published", "paused"].includes(text(row.status))
             ? [
                 {
@@ -201,7 +216,8 @@ export async function AdminResourcePage({
           address: `/p/${row.slug}`,
           placement:
             (
-              { nav: "侧栏", footer: "页脚", none: "不固定" } as Record<
+              // 旧版 nav 已迁入导航管理，按“不固定”显示。
+              { footer: "页脚", none: "不固定", nav: "不固定" } as Record<
                 string,
                 string
               >
@@ -230,9 +246,10 @@ export async function AdminResourcePage({
         description: text(row.merchant_order_no),
         cells: {
           ...base.cells,
-          buyer: text(row.user_id),
-          sku: text(row.sku_type),
-          amount: money(row.amount),
+          // 不展示原始账户 UUID；买家详情见“账户权益”。金额为空在支付订单里没有“询价”含义。
+          buyer: row.user_id ? "站内账户" : "—",
+          sku: ({ subscription: "订阅", series: "手册", single: "单篇", event: "活动票", skill: "技能" } as Record<string, string>)[text(row.sku_type)] ?? label(row.sku_type),
+          amount: row.amount === null ? "—" : money(row.amount),
         },
         actions: [
           { label: "查看订单", href: base.href },
@@ -292,8 +309,9 @@ export async function AdminResourcePage({
       ],
     };
   });
-  const create =
-    resource === "articles"
+  const create = scope
+    ? scope.create
+    : resource === "articles"
       ? {
           label: "新建文章",
           href: `/admin/content${data.query.series ? `?type=chapter&series=${encodeURIComponent(data.query.series)}&returnTo=${encodeURIComponent(returnTo)}` : `?returnTo=${encodeURIComponent(returnTo)}`}`,
@@ -306,11 +324,21 @@ export async function AdminResourcePage({
             ? { label: "新建服务", href: "/admin/services/new" }
             : undefined;
   return (
-    <section className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+    <section
+      className={
+        embedded
+          ? "space-y-6 border-t pt-6"
+          : "mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8"
+      }
+    >
       <header className="space-y-2">
-        <h1 className="text-2xl font-semibold">{spec.title}</h1>
+        {embedded ? (
+          <h2 className="text-xl font-semibold">{scope?.title ?? spec.title}</h2>
+        ) : (
+          <h1 className="text-2xl font-semibold">{scope?.title ?? spec.title}</h1>
+        )}
         <p className="text-sm leading-6 text-muted-foreground">
-          {spec.description}
+          {scope?.description ?? spec.description}
         </p>
       </header>
       {["services", "bookings"].includes(resource) && (
@@ -331,7 +359,7 @@ export async function AdminResourcePage({
         total={data.filteredTotal}
         query={data.query}
         statuses={spec.statuses}
-        types={spec.types}
+        types={types.length > 1 ? types : []}
         create={create}
         sorts={
           resource === "articles" && data.query.series

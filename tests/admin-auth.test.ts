@@ -11,3 +11,12 @@ test('login rejects invalid emails before calling auth', () => {
   assert.equal(validAdminEmail('owner@example.test'), true);
   for (const value of [null, '', 'no-at-sign', 'a@b', 'a b@example.test', 'x'.repeat(255) + '@example.test']) assert.equal(validAdminEmail(value), false);
 });
+
+test('login return path stays on this site and outside auth/admin areas', async () => {
+  const { safeReturnPath, loginHref } = await import("../src/lib/account/auth-flow");
+  assert.equal(safeReturnPath("/handbooks/guide?article=intro#top"), "/handbooks/guide?article=intro#top");
+  assert.equal(safeReturnPath("/events/meetup"), "/events/meetup");
+  for (const bad of [undefined, "", "https://evil.example/x", "//evil.example", "/\\evil.example", "/\nx", "javascript:alert(1)", "/login", "/login?next=/x", "/admin", "/admin/setup", "/api/orders", "/auth/callback", `/${"a".repeat(600)}`])
+    assert.equal(safeReturnPath(bad), "/me", String(bad));
+  assert.equal(loginHref("/checkout/12"), "/login?next=%2Fcheckout%2F12");
+});

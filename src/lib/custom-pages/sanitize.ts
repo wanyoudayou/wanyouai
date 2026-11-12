@@ -118,13 +118,13 @@ export function sanitizeCustomHtml(input: string): string {
         }
         return { tagName, attribs: safe };
       },
-      a: (tagName, attribs) => ({
-        tagName,
-        attribs:
-          attribs.target === "_blank"
-            ? { ...attribs, rel: "noopener noreferrer" }
-            : attribs,
-      }),
+      // target 只保留 _blank / _self；命名窗口会保留 window.opener，统一丢弃。新窗口强制 noopener。
+      a: (tagName, attribs) => {
+        const safe = { ...attribs };
+        if (safe.target !== "_blank" && safe.target !== "_self") delete safe.target;
+        if (safe.target === "_blank") safe.rel = "noopener noreferrer";
+        return { tagName, attribs: safe };
+      },
     },
   });
 }

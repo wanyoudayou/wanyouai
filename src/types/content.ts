@@ -63,7 +63,7 @@ export interface EventCardData {
   state: EventState;
   startsAt: string;
   locationText: string | null;
-  /** null means 免费/未定价活动 */
+  /** null = 站主尚未定价（票价待定）；0 = 免费活动 */
   ticketPrice: number | null;
   memberOnly: boolean;
 }

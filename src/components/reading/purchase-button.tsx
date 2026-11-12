@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 /** 就地购买 CTA（页面契约 2.5）：POST /api/orders → 201 进核对页；409 去 /me。 */
-export function PurchaseButton({ skuType, targetId, label, enabled = true }: { skuType: "subscription" | "series" | "single" | "skill"; targetId?: number | null; label: string; enabled?: boolean }) {
+export function PurchaseButton({ skuType, targetId, label, enabled = true }: { skuType: "subscription" | "series" | "single" | "skill" | "event"; targetId?: number | null; label: string; enabled?: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");

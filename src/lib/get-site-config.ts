@@ -30,8 +30,9 @@ export interface SiteContext {
 }
 
 const FALLBACK: SiteContext = {
-  siteName: "万有AI",
-  tagline: "一人公司的内容、服务与活动工作区",
+  // 读取失败时的中性回退：不显示产品品牌，避免独立部署者的站点冒用默认名称。
+  siteName: "站点",
+  tagline: null,
   ownerName: "站主",
   footerCredit: true,
   home: normalizeHomeConfig({}),

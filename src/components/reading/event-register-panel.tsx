@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { LoginLink } from "@/components/account/login-link";
+import { formatPrice } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import type { Eligibility } from "@/lib/events/eligibility";
 
@@ -14,7 +16,9 @@ export function EventRegisterPanel({
   eligibility,
   registered,
   loggedIn,
+  currency = "CNY",
 }: {
+  currency?: string;
   seriesId: number;
   state: string;
   eligibility: Eligibility | null;
@@ -58,6 +62,12 @@ export function EventRegisterPanel({
         router.push(`/checkout/${data.order.id}`);
         return;
       }
+      if (res.status === 409) {
+        // 已持有本活动票或订阅：刷新后按最新资格直接显示报名入口。
+        router.refresh();
+        setState2({ pending: false, message: data?.message ?? "你已拥有本活动的参与资格，请直接报名。" });
+        return;
+      }
       setState2({ pending: false, message: data?.message ?? "下单失败，请稍后再试。" });
     } catch {
       setState2({ pending: false, message: "网络异常，请稍后再试。" });
@@ -72,7 +82,8 @@ export function EventRegisterPanel({
         {current.status !== "attended" && current.qrSvg ? (
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">现场出示下方二维码给站主扫码核销（建议截图保存），核销后活动纪要将自动解锁：</p>
-            <div className="inline-block rounded-lg bg-white p-2 shadow-xs" dangerouslySetInnerHTML={{ __html: current.qrSvg }} aria-label="核销二维码" />
+            {/* 二维码在深浅模式下都需要白底才能可靠扫描，底色来自 --opc-qr-surface。 */}
+            <div role="img" className="inline-block rounded-lg bg-[var(--opc-qr-surface)] p-2 shadow-xs" dangerouslySetInnerHTML={{ __html: current.qrSvg }} aria-label="核销二维码" />
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">到场时请向工作人员出示本页（或下方核销链接），核销后活动纪要将自动解锁。</p>
@@ -84,12 +95,12 @@ export function EventRegisterPanel({
 
   if (state === "ended") return <p className="text-sm text-muted-foreground">活动已结束，感谢关注。</p>;
   if (state !== "registering") return <p className="text-sm text-muted-foreground">报名尚未开始，可先收藏本页。</p>;
-  if (!loggedIn) return <div className="space-y-2"><Button size="sm" asChild><Link href="/login">登录后报名</Link></Button><p className="text-xs text-muted-foreground">注册即可，无需付费。</p></div>;
+  if (!loggedIn) return <div className="space-y-2"><Button size="sm" asChild><LoginLink>登录后报名</LoginLink></Button><p className="text-xs text-muted-foreground">注册即可，无需付费。</p></div>;
 
   if (eligibility?.action === "buy_ticket") {
     return (
       <div className="space-y-2">
-        <Button size="sm" onClick={buyTicket} disabled={state2.pending}>{state2.pending ? "创建订单…" : `购票 ¥${eligibility.price} 后报名`}</Button>
+        <Button size="sm" onClick={buyTicket} disabled={state2.pending}>{state2.pending ? "创建订单…" : `购票 ${formatPrice(eligibility.price, currency)} 后报名`}</Button>
         <p className="text-xs text-muted-foreground">支付完成后回到本页点击「立即报名」。</p>
         {state2.message && <p role="alert" className="text-xs text-destructive">{state2.message}</p>}
       </div>

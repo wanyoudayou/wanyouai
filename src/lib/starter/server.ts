@@ -81,7 +81,7 @@ export async function publishNextStarterChapter() {
     .eq("id", template.id)
     .single();
   if (job.error || !job.data) throw new Error("STARTER_UNAVAILABLE");
-  if (job.data.completed) return { count: 8, completed: true };
+  if (job.data.completed) return { count: articles.length, completed: true };
   const input = articles[Number(job.data.published_count)];
   if (!input) throw new Error("STARTER_CONTENT_CHANGED");
   const store = createPublisherStore();
@@ -89,7 +89,6 @@ export async function publishNextStarterChapter() {
     ...store,
     // The parent/page stay draft until completion. Invalidate once after activation.
     revalidate() {},
-    onPublished: undefined,
     async replay(id) {
       const { data, error } = await client
         .from("publish_requests")

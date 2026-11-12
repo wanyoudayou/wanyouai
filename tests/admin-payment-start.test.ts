@@ -10,12 +10,16 @@ test("payment start enforces the site switch even for a direct bookmarked checko
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   let enabled = false;
   let calls = 0;
-  const order = { id: 2, user_id: "buyer", status: "pending", amount: 1, merchant_order_no: "91234567890123456789012345678901" };
+  let sellable = true;
+  class OrderError extends Error {}
+  const order = { id: 2, user_id: "buyer", sku_type: "single", target_id: 9, status: "pending", amount: 1, merchant_order_no: "91234567890123456789012345678901" };
   const query = { select: () => query, eq: () => query, maybeSingle: async () => ({ data: order, error: null }) };
   const adapters: Record<string, unknown> = {
     "next/server": { NextResponse: { json: Response.json, redirect: Response.redirect } },
     "@/lib/account/session": { getUserIdentity: async () => ({ user: { id: "buyer" } }) },
     "@/lib/orders/describe": { describeOrder: async () => "Fixture" },
+    "@/lib/orders/service": { OrderError, currentSellablePrice: async () => { if (!sellable) throw new OrderError("NOT_SELLABLE"); return 1; } },
+    "@/lib/orders/supabase": { supabaseOrderGateway: () => ({}) },
     "@/lib/supabase/server": { createSupabaseServerClient: async () => ({ from: () => query }) },
     "@/lib/get-site-config": { getSiteConfig: async () => ({ siteName: "Test", commerce: { paymentEnabled: enabled, paymentChannels: ["alipay"] } }) },
     "@/lib/site-url": { getSiteUrl: () => "https://site.example.test" },
@@ -33,4 +37,9 @@ test("payment start enforces the site switch even for a direct bookmarked checko
   assert.equal(active.status, 302);
   assert.equal(active.headers.get("location"), "https://pay.example.test/submit.php");
   assert.equal(calls, 1);
+  // 待付单创建后商品停售：不得再生成收银台地址。
+  sellable = false;
+  const stopped = await exports.GET!(request());
+  assert.equal(stopped.status, 409);
+  assert.equal(calls, 1, "A product that stopped selling must not reach the provider");
 });

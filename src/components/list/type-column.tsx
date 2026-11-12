@@ -68,8 +68,7 @@ const TIPS: Record<ColumnKind, { title: string; items: string[] }> = {
     title: "可以这样用技能",
     items: [
       "技能卡上的文件清单就是交付物预览",
-      "完整文件包的下载功能尚未开放",
-      "先查看文件清单，了解技能交付物",
+      "购买或订阅后，在技能页下载完整文件包",
     ],
   },
   event: {

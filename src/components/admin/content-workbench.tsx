@@ -1,11 +1,11 @@
 "use client";
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useEffect, useRef, useState, type ComponentProps } from "react";
+import { DownloadIcon, EyeIcon, FileUpIcon, UploadIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { AdminPanelPortal, useAdminPanel } from "./admin-panel";
-import { AdminTabs } from "./admin-tabs";
 import { PreviewPane } from "./preview-pane";
 import { AttachmentLibrary, type Attachment } from "./attachment-library";
 import { RevisionReview } from "./revision-review";
@@ -35,6 +35,13 @@ import { useUnsavedChanges } from "./use-unsaved-changes";
 import { ImageField, MediaPicker } from "./media-library";
 import { uploadLibraryImage } from "@/lib/media/client";
 import { assetMedia } from "@/lib/media/types";
+const ACCESS_HELP: Record<string, string> = {
+  public: "任何人可读全文。",
+  registered: "登录后可读；切点前的内容对访客公开。",
+  subscriber: "有效订阅者可读；切点前的内容公开预览。",
+  paid: "购买本篇、所属手册或订阅后可读；切点前的内容公开预览。",
+  skill: "介绍全文公开；文件下载和在线使用按技能权益控制。",
+};
 const selectClass = "h-9 w-full rounded-md border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70";
 export function ContentWorkbench({
   series,
@@ -92,6 +99,12 @@ export function ContentWorkbench({
   const [savedSnapshot, setSavedSnapshot] = useState(snapshot);
   useUnsavedChanges(snapshot !== savedSnapshot);
   const locked = pending || uploading || importing || attempt !== null;
+  const markdownInput = useRef<HTMLInputElement>(null);
+  const imageInput = useRef<HTMLInputElement>(null);
+  const markdownRef = useRef(markdown);
+  useEffect(() => {
+    markdownRef.current = markdown;
+  }, [markdown]);
 
   async function loadFile(file: File) {
     if (locked) return;
@@ -125,7 +138,7 @@ export function ContentWorkbench({
       setImporting(false);
     }
   }
-  async function uploadImage(file: File) {
+  async function uploadImage(file: File, insert = false) {
     if (locked) return;
     setUploading(true);
     setMessage("");
@@ -143,19 +156,26 @@ export function ContentWorkbench({
           height: uploaded.height,
         },
       ]);
-      setMarkdown((value) => {
-        const replacement = replaceDraftImage(
-          value,
-          uploaded.source_path,
-          data.url,
-        );
-        return replacement.replaced ? replacement.markdown : value;
-      });
+      const replacement = replaceDraftImage(
+        markdownRef.current,
+        uploaded.source_path,
+        data.url,
+      );
+      if (replacement.replaced) setMarkdown(replacement.markdown);
+      else if (insert)
+        setInsertRequest({
+          id: crypto.randomUUID(),
+          text: `![${uploaded.source_path.replace(/[\\\[\]\r\n]/g, " ")}|${uploaded.width}x${uploaded.height}](<${data.url}>)`,
+        });
       setFrontmatter((fm) =>
         fm.cover === uploaded.source_path ? { ...fm, cover: data.url } : fm,
       );
       setMessage(
-        "图片已加入附件库，点击缩略图插入正文。已匹配的缺图引用自动补齐。",
+        replacement.replaced
+          ? "图片已上传，正文中对应的缺图已补齐。"
+          : insert
+            ? "图片已上传并插入正文光标处。"
+            : "图片已上传，可在下方本篇图片中点击插入。",
       );
     } catch (error) {
       setMessage(
@@ -186,7 +206,8 @@ export function ContentWorkbench({
     link.href = url;
     link.download = `${/^[a-z0-9-]+$/.test(frontmatter.slug) ? frontmatter.slug : "draft"}.md`;
     link.click();
-    URL.revokeObjectURL(url);
+    // 部分浏览器在点击后异步开始下载，立即回收会取消下载。
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   async function submit(andPublish = false) {
     if (pending || uploading) return;
@@ -240,7 +261,9 @@ export function ContentWorkbench({
           id: saved.id,
         });
         if (published.status === "blocked") {
-          setMessage("发布被规则阻断，请在下方审核面板查看原因并处理。");
+          // 阻断诊断交给发布反馈区展示，修订保留以便修正后重新发布。
+          setResult(published);
+          setMessage("发布被规则阻断，原因见下方；修订已保存，修正后可重新发布。");
         } else {
           setResult(published);
           setSavedRevision(undefined);
@@ -249,7 +272,7 @@ export function ContentWorkbench({
         }
       } else {
         setMessage(
-          "修订已保存或匹配到已有版本。请在下方审核面板确认发布状态。",
+          "已保存，线上内容未改变。可在下方核对后发布。",
         );
       }
     } catch (error) {
@@ -259,246 +282,127 @@ export function ContentWorkbench({
       setPending(false);
     }
   }
+  const dirty = snapshot !== savedSnapshot;
+  const field = (
+    key: "title" | "slug" | "summary",
+    label: string,
+    extra: Partial<ComponentProps<typeof Input>> = {},
+  ) => (
+    <Input
+      aria-label={label}
+      value={frontmatter[key] ?? ""}
+      onChange={(event) =>
+        setFrontmatter({ ...frontmatter, [key]: event.target.value })
+      }
+      {...extra}
+    />
+  );
   return (
-    <div className="space-y-6">
-      <AdminTabs active={frontmatter.type === "chapter" ? "albums" : "blog"} />
-      <fieldset disabled={locked} className="grid min-w-0 gap-4 sm:grid-cols-2">
-        {(
-          [
-            ["title", "标题"],
-            ["slug", "文章地址标识（slug）"],
-            ["summary", "摘要"],
-            ["cover", "封面图片地址（可选）"],
-          ] as const
-        ).map(([key, label]) =>
-          key === "cover" ? (
-            <ImageField
-              key={key}
-              label={label}
-              value={frontmatter.cover ?? ""}
-              disabled={locked}
-              onChange={(url) => setFrontmatter({ ...frontmatter, cover: url })}
-            />
-          ) : (
-            <label key={key} className="space-y-2 text-sm">
-              {label}
-              <Input
-                disabled={
-                  key === "slug" &&
-                  media.some(
-                    (item) => !item.storage_path.startsWith("media/library/"),
-                  )
-                }
-                placeholder={key === "slug" ? "例如 my-first-post" : undefined}
-                aria-describedby={key === "slug" ? "slug-help" : undefined}
-                value={frontmatter[key] ?? ""}
-                onChange={(event) =>
-                  setFrontmatter({ ...frontmatter, [key]: event.target.value })
-                }
-                maxLength={key === "slug" ? 120 : key === "title" ? 180 : 500}
-              />
-              {key === "slug" && (
-                <span
-                  id="slug-help"
-                  className="block break-all text-xs leading-5 text-muted-foreground"
-                >
-                  用于文章网址的固定标识，需 2–120 个小写字母、数字或短横线。
-                  {frontmatter.type !== "chapter"
-                    ? `网址示例：/${frontmatter.type === "skill" ? "skills" : "blog"}/${frontmatter.slug || "my-first-post"}`
-                    : `章节参数：?article=${frontmatter.slug || "chapter-one"}`}
-                  。相同标识会更新原文章，请勿用于不同内容。
-                </span>
-              )}
-            </label>
-          ),
-        )}
-        <label className="space-y-2 text-sm">
-          内容类型
-          <select
-            className={selectClass}
-            aria-label="内容类型"
-            aria-describedby={frontmatter.type === "skill" ? "skill-type-help" : undefined}
-            value={frontmatter.type}
-            disabled={initialType === "skill" || initialDraft?.frontmatter.type === "skill"}
-            onChange={(event) => {
-              const type = event.target.value as Frontmatter["type"];
-              setFrontmatter((fm) => {
-                const next = { ...fm, type };
-                delete next.price;
-                delete next.series_slug;
-                if (type === "chapter")
-                  next.series_slug = series[0]?.slug ?? "";
-                return next;
-              });
-            }}
-          >
-            <option value="blog">独立博客</option>
-            <option value="chapter">专辑章节</option>
-            {frontmatter.type === "skill" && <option value="skill">Skill 公开介绍</option>}
-          </select>
-          {frontmatter.type === "skill" && <span id="skill-type-help" className="block text-xs text-muted-foreground">已固定为 Skill 公开介绍。</span>}
-        </label>
-        <label className="space-y-2 text-sm">
-          阅读权限
-          <select
-            className={selectClass}
-            aria-label="阅读权限"
-            aria-describedby={frontmatter.type === "skill" ? "skill-access-help" : undefined}
-            value={frontmatter.access}
-            disabled={frontmatter.type === "skill"}
-            onChange={(event) => {
-              const access = event.target.value as Frontmatter["access"];
-              setFrontmatter((fm) => {
-                const next = { ...fm, access };
-                delete next.price;
-                return next;
-              });
-            }}
-          >
-            <option value="public">公开</option>
-            <option value="registered">注册可读</option>
-            <option value="subscriber">订阅可读</option>
-            <option value="paid">付费可读</option>
-          </select>
-          {frontmatter.type === "skill" && <span id="skill-access-help" className="block text-xs text-muted-foreground">介绍全文公开；文件下载和在线测试按 Skill 权益控制。</span>}
-        </label>
-        {frontmatter.type === "chapter" && (
-          <label className="space-y-2 text-sm">
-            所属专辑
-            <select
-              className={selectClass}
-              value={frontmatter.series_slug ?? ""}
-              onChange={(event) =>
-                setFrontmatter({
-                  ...frontmatter,
-                  series_slug: event.target.value,
-                })
-              }
-            >
-              <option value="">请选择专辑</option>
-              {series.map((item) => (
-                <option key={item.slug} value={item.slug}>
-                  {item.title}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        {frontmatter.type === "blog" && frontmatter.access === "paid" && (
-          <label className="space-y-2 text-sm">
-            单篇价格（元）
-            <Input
-              type="number"
-              min="0.01"
-              max="999999.99"
-              step="0.01"
-              value={frontmatter.price ?? ""}
-              onChange={(event) =>
-                setFrontmatter({
-                  ...frontmatter,
-                  price: event.target.value
-                    ? Number(event.target.value)
-                    : undefined,
-                })
-              }
-            />
-          </label>
-        )}
-        <label className="space-y-2 text-sm">
-          标签（英文逗号分隔）
+    <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="min-w-0 space-y-4">
+        <label className="block space-y-2 text-sm">
+          <span className="sr-only">标题</span>
           <Input
-            value={frontmatter.tags?.join(",") ?? ""}
+            aria-label="标题"
+            disabled={locked}
+            placeholder="文章标题"
+            className="h-12 text-lg font-medium"
+            value={frontmatter.title ?? ""}
+            maxLength={180}
             onChange={(event) =>
-              setFrontmatter({
-                ...frontmatter,
-                tags: event.target.value.split(","),
-              })
+              setFrontmatter({ ...frontmatter, title: event.target.value })
             }
           />
         </label>
-      </fieldset>
-      <fieldset disabled={locked} className="space-y-4 rounded-lg border p-4">
-        <label className="block space-y-2 text-sm">
-          导入 .md 文件（替换当前草稿）
-          <Input
-            type="file"
-            accept=".md,.markdown,text/markdown"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void loadFile(file);
-              event.target.value = "";
-            }}
-          />
-        </label>
+        <input
+          ref={markdownInput}
+          type="file"
+          hidden
+          aria-label="导入 Markdown 文件"
+          accept=".md,.markdown,text/markdown"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) void loadFile(file);
+            event.target.value = "";
+          }}
+        />
+        <input
+          ref={imageInput}
+          type="file"
+          hidden
+          aria-label="上传图片"
+          accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) void uploadImage(file, true);
+            event.target.value = "";
+          }}
+        />
+        <MarkdownEditor
+          value={markdown}
+          onChange={setMarkdown}
+          disabled={locked}
+          onImage={(file) => uploadImage(file, true)}
+          onPaywall={enablePaywall}
+          insertRequest={insertRequest}
+          toolbar={
+            <>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={locked}
+                onClick={() => imageInput.current?.click()}
+              >
+                <UploadIcon className="size-4" aria-hidden />
+                上传图片
+              </Button>
+              <MediaPicker
+                disabled={locked}
+                size="sm"
+                label="从素材库插入"
+                onSelect={(asset) =>
+                  setInsertRequest({
+                    id: crypto.randomUUID(),
+                    text: `![${(asset.alt || asset.name).replace(/[\\\[\]\r\n]/g, " ")}](<${asset.url}>)`,
+                  })
+                }
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={locked}
+                onClick={() => markdownInput.current?.click()}
+              >
+                <FileUpIcon className="size-4" aria-hidden />
+                导入 .md
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={(event) => show("匿名预览", event.currentTarget)}
+              >
+                <EyeIcon className="size-4" aria-hidden />
+                匿名预览
+              </Button>
+            </>
+          }
+        />
         <p className="text-xs text-muted-foreground">
-          支持普通 Markdown 或带文件属性的
-          Markdown，缺少的发布信息可在上方补齐。
+          可直接把图片拖入正文。图片上传后公开可访问，阅读权限不保护图片地址；单张最大 10 MiB。
         </p>
-        <p role="status" aria-live="polite" className="break-words text-sm">
-          {importStatus}
-        </p>
-        <label className="block space-y-2 text-sm">
-          原图片引用路径（可选，用于补齐缺图）
-          <Input
-            placeholder="例如 assets/diagram.png"
-            value={sourcePath}
-            onChange={(event) => setSourcePath(event.target.value)}
-          />
-        </label>
-        <label className="block space-y-2 text-sm">
-          上传图片（也可拖入编辑器）
-          <Input
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void uploadImage(file);
-              event.target.value = "";
-            }}
-          />
-        </label>
-        <p className="text-xs text-muted-foreground">
-          图片上传后公开可访问；正文的阅读权限不保护图片 URL。每次上传一张，最大
-          10 MiB。已上传图片可在全站素材库重复选用。
-        </p>
-      </fieldset>
-      <MediaPicker
-        disabled={locked}
-        label="从素材库插入正文"
-        onSelect={(asset) =>
-          setInsertRequest({
-            id: crypto.randomUUID(),
-            text: `![${(asset.alt || asset.name).replace(/[\\\[\]\r\n]/g, " ")}](<${asset.url}>)`,
-          })
-        }
-      />
-      <AttachmentLibrary
-        items={attachments}
-        disabled={locked}
-        onInsert={(text) => setInsertRequest({ id: crypto.randomUUID(), text })}
-      />
-      <div className="min-w-0 space-y-4">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={(event) => show("匿名预览", event.currentTarget)}
-        >
-          匿名预览
-        </Button>
-        <section className="min-w-0 space-y-3">
-          <h2 className="text-lg font-medium">Markdown 正文</h2>
-          <p className="text-xs text-muted-foreground">
-            在正文光标处插入付费切点；已有切点时会跳转定位。
+        {importStatus && (
+          <p role="status" aria-live="polite" className="break-words text-sm">
+            {importStatus}
           </p>
-          <MarkdownEditor
-            value={markdown}
-            onChange={setMarkdown}
-            disabled={locked}
-            onImage={uploadImage}
-            onPaywall={enablePaywall}
-            insertRequest={insertRequest}
-          />
-        </section>
+        )}
+        <AttachmentLibrary
+          items={attachments}
+          disabled={locked}
+          onInsert={(text) => setInsertRequest({ id: crypto.randomUUID(), text })}
+        />
         <AdminPanelPortal>
           <PreviewPane
             markdown={markdown}
@@ -507,32 +411,221 @@ export function ContentWorkbench({
             disabled={locked}
           />
         </AdminPanelPortal>
+        {savedRevision && (
+          <RevisionReview
+            key={savedRevision}
+            id={savedRevision}
+            autoLoad
+            onPublished={() => router.refresh()}
+          />
+        )}
+        <PublicationFeedback result={result} message={message} />
       </div>
-      <div className="flex flex-wrap gap-3">
-        <Button onClick={() => submit()} disabled={pending || uploading}>
-          {pending ? "正在保存…" : attempt ? "重试保存" : "保存待发布修订"}
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => submit(true)}
-          disabled={pending || uploading}
-          title="保存并立即确认发布（仍走同一发布管线，幂等不变）"
+      <aside className="min-w-0 space-y-4">
+        <div className="space-y-3 rounded-xl border bg-card p-4">
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            {pending
+              ? "正在保存…"
+              : dirty
+                ? "有未保存的修改"
+                : savedRevision
+                  ? "修订已保存，尚未发布"
+                  : "没有未保存的修改"}
+          </p>
+          <Button
+            className="w-full"
+            onClick={() => submit(true)}
+            disabled={pending || uploading}
+          >
+            {pending ? "正在处理…" : attempt ? "重试发布" : "发布"}
+          </Button>
+          <Button
+            className="w-full"
+            variant="outline"
+            onClick={() => submit()}
+            disabled={pending || uploading}
+            title="保存为待发布修订，不影响线上内容"
+          >
+            仅保存，不发布
+          </Button>
+          <Button className="w-full" variant="ghost" size="sm" onClick={downloadDraft}>
+            <DownloadIcon className="size-4" aria-hidden />
+            下载 Markdown
+          </Button>
+        </div>
+        <fieldset
+          disabled={locked}
+          className="space-y-4 rounded-xl border bg-card p-4"
         >
-          保存并直接发布
-        </Button>
-        <Button variant="outline" onClick={downloadDraft}>
-          下载草稿
-        </Button>
-      </div>
-      {savedRevision && (
-        <RevisionReview
-          key={savedRevision}
-          id={savedRevision}
-          autoLoad
-          onPublished={() => router.refresh()}
-        />
-      )}
-      <PublicationFeedback result={result} message={message} />
+          <legend className="sr-only">发布设置</legend>
+          <h2 className="text-sm font-medium">发布设置</h2>
+          <label className="block space-y-2 text-sm">
+            内容类型
+            <select
+              className={selectClass}
+              aria-label="内容类型"
+              aria-describedby={frontmatter.type === "skill" ? "skill-type-help" : undefined}
+              value={frontmatter.type}
+              disabled={initialType === "skill" || initialDraft?.frontmatter.type === "skill"}
+              onChange={(event) => {
+                const type = event.target.value as Frontmatter["type"];
+                setFrontmatter((fm) => {
+                  const next = { ...fm, type };
+                  delete next.price;
+                  delete next.series_slug;
+                  if (type === "chapter")
+                    next.series_slug = series[0]?.slug ?? "";
+                  return next;
+                });
+              }}
+            >
+              <option value="blog">博客文章</option>
+              <option value="chapter">手册或活动的章节</option>
+              {frontmatter.type === "skill" && <option value="skill">技能公开介绍</option>}
+            </select>
+            {frontmatter.type === "skill" && <span id="skill-type-help" className="block text-xs text-muted-foreground">已固定为技能公开介绍。</span>}
+          </label>
+          {frontmatter.type === "chapter" && (
+            <label className="block space-y-2 text-sm">
+              所属手册或活动
+              <select
+                className={selectClass}
+                aria-label="所属手册或活动"
+                value={frontmatter.series_slug ?? ""}
+                onChange={(event) =>
+                  setFrontmatter({
+                    ...frontmatter,
+                    series_slug: event.target.value,
+                  })
+                }
+              >
+                <option value="">请选择</option>
+                {series.map((item) => (
+                  <option key={item.slug} value={item.slug}>
+                    {item.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <label className="block space-y-2 text-sm">
+            阅读权限
+            <select
+              className={selectClass}
+              aria-label="阅读权限"
+              aria-describedby="access-help"
+              value={frontmatter.access}
+              disabled={frontmatter.type === "skill"}
+              onChange={(event) => {
+                const access = event.target.value as Frontmatter["access"];
+                setFrontmatter((fm) => {
+                  const next = { ...fm, access };
+                  delete next.price;
+                  return next;
+                });
+              }}
+            >
+              <option value="public">公开</option>
+              <option value="registered">注册可读</option>
+              <option value="subscriber">订阅可读</option>
+              <option value="paid">付费可读</option>
+            </select>
+            <span id="access-help" className="block text-xs leading-5 text-muted-foreground">
+              {ACCESS_HELP[frontmatter.type === "skill" ? "skill" : frontmatter.access]}
+            </span>
+          </label>
+          {frontmatter.type === "blog" && frontmatter.access === "paid" && (
+            <label className="block space-y-2 text-sm">
+              单篇价格（元）
+              <Input
+                type="number"
+                min="0.01"
+                max="999999.99"
+                step="0.01"
+                value={frontmatter.price ?? ""}
+                onChange={(event) =>
+                  setFrontmatter({
+                    ...frontmatter,
+                    price: event.target.value
+                      ? Number(event.target.value)
+                      : undefined,
+                  })
+                }
+              />
+            </label>
+          )}
+        </fieldset>
+        <fieldset
+          disabled={locked}
+          className="space-y-4 rounded-xl border bg-card p-4"
+        >
+          <legend className="sr-only">展示信息</legend>
+          <h2 className="text-sm font-medium">展示信息</h2>
+          <label className="block space-y-2 text-sm">
+            摘要
+            {field("summary", "摘要", { maxLength: 500, placeholder: "列表和分享时显示的一句话" })}
+          </label>
+          <ImageField
+            label="封面（可选）"
+            value={frontmatter.cover ?? ""}
+            disabled={locked}
+            onChange={(url) => setFrontmatter({ ...frontmatter, cover: url })}
+          />
+          <label className="block space-y-2 text-sm">
+            标签
+            <Input
+              placeholder="用英文逗号分隔"
+              value={frontmatter.tags?.join(",") ?? ""}
+              onChange={(event) =>
+                setFrontmatter({
+                  ...frontmatter,
+                  tags: event.target.value.split(","),
+                })
+              }
+            />
+          </label>
+        </fieldset>
+        <details className="group rounded-xl border bg-card p-4" open={!frontmatter.slug}>
+          <summary className="cursor-pointer text-sm font-medium">
+            网址与导入
+          </summary>
+          <fieldset disabled={locked} className="mt-4 space-y-4">
+            <label className="block space-y-2 text-sm">
+              网址标识
+              {field("slug", "网址标识", {
+                maxLength: 120,
+                placeholder: "例如 my-first-post",
+                "aria-describedby": "slug-help",
+                disabled:
+                  locked ||
+                  media.some(
+                    (item) => !item.storage_path.startsWith("media/library/"),
+                  ),
+              })}
+              <span
+                id="slug-help"
+                className="block break-all text-xs leading-5 text-muted-foreground"
+              >
+                {frontmatter.type !== "chapter"
+                  ? `访问地址 /${frontmatter.type === "skill" ? "skills" : "blog"}/${frontmatter.slug || "my-first-post"}`
+                  : `章节参数 ?article=${frontmatter.slug || "chapter-one"}`}
+                。小写字母、数字或短横线；相同标识会更新原文章。
+              </span>
+            </label>
+            <label className="block space-y-2 text-sm">
+              原图片引用路径
+              <Input
+                placeholder="例如 assets/diagram.png"
+                value={sourcePath}
+                onChange={(event) => setSourcePath(event.target.value)}
+              />
+              <span className="block text-xs leading-5 text-muted-foreground">
+                导入的 Markdown 引用了本地图片时，先填写它的路径再上传，正文中的缺图会自动替换。
+              </span>
+            </label>
+          </fieldset>
+        </details>
+      </aside>
     </div>
   );
 }

@@ -35,7 +35,9 @@ export async function listSkills(raw: RawListQuery, owner = false) {
     if (!owner) request = request.in("status", ["published", "paused"]);
     else if (["draft", "published", "paused", "archived"].includes(query.status)) request = request.eq("status", query.status);
     if (query.q) request = request.ilike("title", `%${escapeLike(query.q)}%`);
-    return request.order(query.sort === "title" ? "title" : "updated_at", { ascending: query.sort !== "newest" }).order("id", { ascending: false });
+    // 只支持 newest / oldest / title；其余排序值按最新处理，避免静默变成升序。
+    const sort = ["oldest", "title"].includes(query.sort) ? query.sort : "newest";
+    return request.order(sort === "title" ? "title" : "updated_at", { ascending: sort !== "newest" }).order("id", { ascending: false });
   };
   let result = await filter().range((query.page - 1) * query.pageSize, query.page * query.pageSize - 1);
   if (result.error || result.count === null) throw new SkillError("Skill 列表暂时无法读取。", 503);

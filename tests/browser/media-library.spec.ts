@@ -83,12 +83,12 @@ for (const width of [320, 1440])
     await cover.click();
     await dialog.getByRole("button", { name: /示例图片/ }).click();
     await expect(
-      page.getByLabel("封面图片地址（可选）", { exact: true }),
+      page.getByLabel("封面（可选）", { exact: true }),
     ).toHaveValue(path);
     await expect(page.getByLabel("标题", { exact: true })).toHaveValue(
       "草稿不丢失",
     );
-    await page.getByRole("button", { name: "从素材库插入正文" }).click();
+    await page.getByRole("button", { name: "从素材库插入" }).click();
     await dialog.getByRole("button", { name: /示例图片/ }).click();
     await expect(page.locator(".cm-content")).toContainText(path);
     expect(errors).toEqual([]);

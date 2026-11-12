@@ -22,11 +22,13 @@ async function answerRequest(request: Request) {
   if (!sameSiteOrigin(request.headers.get("origin"), process.env.SITE_URL)) return NextResponse.json({ message: "请求来源无效。" }, { status: 403 });
   const cancelled = new AbortController();
   const signal = AbortSignal.any([request.signal, cancelled.signal, AbortSignal.timeout(45_000)]);
-  let body: { question?: unknown; pins?: unknown; turnstileToken?: unknown };
+  let body: { question?: unknown; pins?: unknown; room?: unknown; turnstileToken?: unknown };
   try { body = object(await providerJSON(new Response(request.body), signal, 8192)); } catch { return NextResponse.json({ message: "请求格式无效或过大" }, { status: 400 }); }
   const question = typeof body.question === "string" ? body.question.trim() : "";
   if (!question || Buffer.byteLength(question) > 1024) return NextResponse.json({ message: "问题为空或过长（最多 1024 UTF-8 字节）" }, { status: 400 });
   const pins = Array.isArray(body.pins) ? body.pins.filter((p): p is string => typeof p === "string" && /^[a-z0-9-]{1,120}$/.test(p)).slice(0, 3) : [];
+  // 会话所属文章由页面显式传入，与 @ 引用无关；首页一对一会话不挂文章。
+  const room = typeof body.room === "string" && /^[a-z0-9-]{1,120}$/.test(body.room) ? body.room : null;
 
   const reader = await getReader();
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? request.headers.get("x-real-ip");
@@ -74,9 +76,10 @@ async function answerRequest(request: Request) {
         if (reader.userId && !signal.aborted) {
           try {
             let articleId: number | null = null;
-            if (pins.length === 1) {
-              const { data: pin } = await service.from("articles").select("id").eq("slug", pins[0]).maybeSingle();
-              articleId = pin?.id ?? null;
+            if (room) {
+              const { data: article } = await service.from("articles").select("id").eq("slug", room)
+                .in("type", ["blog", "chapter", "skill"]).in("status", ["published", "paused"]).maybeSingle();
+              articleId = article?.id ?? null;
             }
             const { data: conversation } = await service
               .from("conversations")

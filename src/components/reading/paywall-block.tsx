@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { LockIcon } from "lucide-react";
 import { Callout } from "@/components/shared/callout";
 import { Button } from "@/components/ui/button";
 import { PurchaseButton } from "@/components/reading/purchase-button";
+import { LoginLink } from "@/components/account/login-link";
 import { formatPrice } from "@/lib/format";
 import type { ReadingArticle, ReadingSeries } from "@/types/reading";
 import type { EventDetailsRow } from "@/types/database";
@@ -29,7 +29,7 @@ export function PaywallBlock({ article, series = null, event = null, commerce, v
   if (registered && viewer.loggedIn) return null;
   if (subscriber && !eventReading && viewer.subscribed) return null;
 
-  const loginCta = <Button asChild size="sm"><Link href="/login">登录后阅读</Link></Button>;
+  const loginCta = <Button asChild size="sm"><LoginLink>登录后阅读</LoginLink></Button>;
   const crossCard = !viewer.subscribed && subscriptionPrice ? (
     <div className="rounded-md border bg-muted/40 p-3 text-sm">
       <p className="font-medium text-foreground">订阅解锁全站付费内容</p>
@@ -55,7 +55,7 @@ export function PaywallBlock({ article, series = null, event = null, commerce, v
                 : subscriber ? <PurchaseButton skuType="subscription" label={subscriptionPrice ? `订阅 ${formatPrice(subscriptionPrice.amount, subscriptionPrice.currency)} / 年` : "订阅全站"} enabled={commerce.paymentEnabled} />
                 : series && series.type !== "event" ? <PurchaseButton skuType="series" targetId={series.id} label="购买整本内容" enabled={commerce.paymentEnabled} />
                 : <PurchaseButton skuType="single" targetId={article.id} label="购买本篇" enabled={commerce.paymentEnabled} />}
-              {eventReading && event?.state === "registering" && event.ticket_price !== null && Number(event.ticket_price) > 0 ? <Button disabled size="sm" variant="outline" title="活动线上售票随报名闭环开放">活动票 {formatPrice(Number(event.ticket_price), currency)}</Button> : null}
+              {eventReading && series && event?.state === "registering" && event.ticket_price !== null && Number(event.ticket_price) > 0 ? <PurchaseButton skuType="event" targetId={series.id} label={`购买活动票 ${formatPrice(Number(event.ticket_price), currency)}`} enabled={commerce.paymentEnabled} /> : null}
             </div>
             {article.access === "paid" ? <div className="mt-3">{crossCard}</div> : null}
           </>}

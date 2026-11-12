@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { EditorView, keymap } from "@codemirror/view";
 import { Compartment, EditorState } from "@codemirror/state";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
@@ -9,11 +9,21 @@ import { Button } from "@/components/ui/button";
 import { paywallEdit } from "@/lib/admin/paywall-edit";
 import { basicSetup } from "codemirror";
 
-export default function MarkdownEditor({ value, onChange, disabled, onImage, onPaywall, insertRequest }: { value: string; onChange: (value: string) => void; disabled: boolean; onImage: (file: File) => Promise<void>; onPaywall: () => void; insertRequest?: { id: string; text: string } }) {
+export default function MarkdownEditor({ value, onChange, disabled, onImage, onPaywall, insertRequest, toolbar }: { value: string; onChange: (value: string) => void; disabled: boolean; onImage: (file: File) => Promise<void>; onPaywall: () => void; insertRequest?: { id: string; text: string }; toolbar?: ReactNode }) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const callbacks = useRef({ onChange, onImage, onPaywall });
   const editable = useRef(new Compartment());
+  // 编辑器尚未加载或暂时只读时到达的插入请求先排队，可编辑后再应用，不丢失。
+  const appliedInsert = useRef<string | null>(null);
+  function applyPendingInsert() {
+    const editor = view.current;
+    if (!editor || !insertRequest || appliedInsert.current === insertRequest.id || editor.state.readOnly) return;
+    appliedInsert.current = insertRequest.id;
+    const { from, to } = editor.state.selection.main;
+    editor.dispatch({ changes: { from, to, insert: insertRequest.text }, selection: { anchor: from + insertRequest.text.length }, scrollIntoView: true });
+    editor.focus();
+  }
   function insertPaywall(editor = view.current) {
     if (!editor || editor.state.readOnly) return false;
     const edit = paywallEdit(editor.state.doc.toString(), editor.state.selection.main.head);
@@ -47,25 +57,26 @@ export default function MarkdownEditor({ value, onChange, disabled, onImage, onP
         if (editor.contentDOM.contentEditable === "true") void callbacks.current.onImage(files[0]);
         return true;
       } }),
-      EditorView.theme({ "&": { color: "var(--foreground)", backgroundColor: "var(--background)" }, ".cm-content": { minHeight: "24rem", fontFamily: "var(--font-mono)" }, ".cm-scroller": { overflow: "auto" }, ".cm-gutters": { backgroundColor: "var(--muted)", color: "var(--muted-foreground)", border: "none" }, ".cm-activeLine, .cm-activeLineGutter": { backgroundColor: "var(--accent)" }, "&.cm-focused": { outline: "2px solid var(--ring)" } }),
+      EditorView.theme({ "&": { color: "var(--foreground)", backgroundColor: "var(--background)" }, ".cm-content": { minHeight: "32rem", fontFamily: "var(--font-mono)" }, ".cm-scroller": { overflow: "auto" }, ".cm-gutters": { backgroundColor: "var(--muted)", color: "var(--muted-foreground)", border: "none" }, ".cm-activeLine, .cm-activeLineGutter": { backgroundColor: "var(--accent)" }, "&.cm-focused": { outline: "2px solid var(--ring)" } }),
     ] });
     view.current = editor;
+    applyPendingInsert();
     return () => { editor.destroy(); view.current = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the editor is created once; pending inserts are read from the latest props
   }, []);
   useEffect(() => {
     const editor = view.current;
     if (editor && editor.state.doc.toString() !== value) editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: value } });
   }, [value]);
-  useEffect(() => { view.current?.dispatch({ effects: editable.current.reconfigure([EditorView.editable.of(!disabled), EditorState.readOnly.of(disabled)]) }); }, [disabled]);
   useEffect(() => {
-    const editor=view.current;
-    if(!editor || !insertRequest || editor.state.readOnly) return;
-    const {from,to}=editor.state.selection.main;
-    editor.dispatch({changes:{from,to,insert:insertRequest.text},selection:{anchor:from+insertRequest.text.length},scrollIntoView:true});
-    editor.focus();
-  },[insertRequest]);
+    view.current?.dispatch({ effects: editable.current.reconfigure([EditorView.editable.of(!disabled), EditorState.readOnly.of(disabled)]) });
+    applyPendingInsert();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- applyPendingInsert reads the latest insert request
+  }, [disabled]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- applyPendingInsert reads the latest insert request
+  useEffect(() => { applyPendingInsert(); }, [insertRequest]);
   return <div className="space-y-3">
-    <div className="flex flex-wrap items-center gap-2"><Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => insertPaywall()}>插入付费切点</Button><span className="text-xs text-muted-foreground">⌘ / Ctrl + Shift + P</span></div>
+    <div role="toolbar" aria-label="正文工具" className="flex flex-wrap items-center gap-2">{toolbar}<Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => insertPaywall()} title="⌘ / Ctrl + Shift + P">插入付费切点</Button></div>
     <div ref={host} className="min-w-0 overflow-hidden rounded-lg border text-sm" />
   </div>;
 }

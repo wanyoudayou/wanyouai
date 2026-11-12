@@ -116,12 +116,12 @@ export function FolderImport({
         try {
           if (file.size > 2 * 1024 * 1024)
             throw new Error("Markdown 不能超过 2 MiB。");
-          const imported = importMarkdown(
-            await file.text(),
-            path.split("/").pop(),
-          );
+          const text = await file.text();
+          const imported = importMarkdown(text, path.split("/").pop());
           const existing = current.files.find((f) => f.path === path);
-          if (!/^---\r?\n[\s\S]*?\bslug\s*:/m.test(await file.text()))
+          // 只在文件开头的 frontmatter 块里查找 slug；正文里的分隔线或 "slug:" 不算。
+          const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text)?.[1];
+          if (!frontmatter || !/^slug\s*:/m.test(frontmatter))
             imported.frontmatter.slug = existing?.article_slug ?? "";
           const candidate: Candidate = {
             scope,
@@ -340,7 +340,7 @@ export function FolderImport({
       <p role="status" className="break-words text-sm">
         {message}
       </p>
-      {album && rows.some(r => r.done) && <Button asChild><Link href={`/admin/collections/${album.id}`}>前往专辑设置与全辑审核</Link></Button>}
+      {album && rows.some(r => r.done) && <Button asChild><Link href={`/admin/collections/${album.id}`}>前往设置与发布审核</Link></Button>}
       <section className="space-y-3" aria-label="云端文件清单">
         <h2 className="font-medium">云端文件清单</h2>
         <p className="text-xs text-muted-foreground">

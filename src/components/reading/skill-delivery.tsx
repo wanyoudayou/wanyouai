@@ -1,4 +1,5 @@
 "use client";
+import { readJson, requestErrorMessage } from "@/lib/http-client";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CopyIcon, CheckIcon } from "lucide-react";
@@ -11,7 +12,8 @@ export function SkillDelivery({ release, version }: { release: string; version: 
     setBusy(true); setMessage(""); setUrl(""); setCopied(false);
     try {
       const response = await fetch("/api/skills/delivery", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op, release, ...(op === "revoke" ? { id: grant?.id } : {}) }), signal: AbortSignal.timeout(25000) });
-      const result = await response.json(); if (!response.ok) throw new Error(result.message);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- response shape varies by op
+      const result = await readJson<any>(response, "暂时无法完成，请稍后再试。");
       if (op === "download") { setUrl(result.url); setMessage(`下载地址已生成，${result.expiresIn} 秒内有效。`); }
       if (op === "revoke") { setGrant(null); setMessage(result.message); }
       if (op === "install") setGrant({ id: result.id, expiresAt: result.expiresAt, instruction: [
@@ -24,7 +26,7 @@ export function SkillDelivery({ release, version }: { release: string; version: 
         "文件清单：", ...result.release.manifest.map((f: SkillFile) => `${f.path} · ${f.size} bytes · ${f.sha256}`),
         `授权到期：${result.expiresAt}。此授权只用于本版本，不授予发布或账户管理权限。`,
       ].join("\n") });
-    } catch (error) { setMessage(error instanceof Error ? error.message : "暂时无法下载。"); }
+    } catch (error) { setMessage(requestErrorMessage(error, "暂时无法下载。")); }
     finally { setBusy(false); }
   }
   return <div className="space-y-3"><div className="flex flex-wrap gap-3"><Button disabled={busy} onClick={() => request("download")}>下载 v{version}</Button><Button disabled={busy} variant="outline" onClick={() => request("install")}>生成远程安装说明</Button></div>

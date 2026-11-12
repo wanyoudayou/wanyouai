@@ -26,11 +26,11 @@ for (const theme of ["light", "dark"] as const) {
     await expect(page.locator(`.opc-hero__image--${theme} img`)).toHaveJSProperty("naturalWidth", 1600);
     await expect(page.getByRole("heading", { level: 1 })).toHaveCSS(
       "color",
-      theme === "light" ? "rgb(45, 42, 69)" : "rgb(217, 242, 224)",
+      theme === "light" ? "rgb(45, 42, 69)" : "rgb(230, 227, 245)",
     );
     await expect(page.locator(".opc-hero__input")).toHaveCSS(
       "color",
-      theme === "light" ? "rgb(45, 42, 69)" : "rgb(217, 242, 224)",
+      theme === "light" ? "rgb(45, 42, 69)" : "rgb(230, 227, 245)",
     );
     await page.getByLabel("向站主的分身提问").fill("切换横幅时保留的问题");
     const opposite = theme === "light" ? "dark" : "light";
@@ -90,3 +90,37 @@ for (const theme of ["light", "dark"] as const) {
     });
   });
 }
+
+test("hero compresses to a pinned ask box bar while scrolling, at every breakpoint", async ({ page }) => {
+  for (const width of [1440, 1024, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+    const hero = page.getByRole("region", { name: "站点介绍" });
+    const title = hero.getByRole("heading", { level: 1 });
+    const ask = hero.getByLabel("向站主的分身提问");
+    await expect(hero).toHaveAttribute("data-collapse", "");
+    await page.evaluate(() => {
+      const spacer = document.createElement("div");
+      spacer.style.height = "3000px";
+      document.querySelector("main")!.append(spacer);
+    });
+    const header = page.locator("[data-shell-header]");
+    const headerBottom = (await header.isVisible()) ? (await header.boundingBox())!.y + (await header.boundingBox())!.height : 0;
+
+    await page.evaluate(() => window.scrollTo(0, 1500));
+    await expect(hero).toHaveAttribute("data-collapsed", "");
+    await expect(title).toHaveCSS("opacity", "0");
+    await expect(ask).toBeInViewport();
+    const heroBox = (await hero.boundingBox())!;
+    const askBox = (await ask.boundingBox())!;
+    const visible = heroBox.y + heroBox.height - headerBottom;
+    expect(Math.abs(visible - (askBox.height + 24)), `${width}px bar height`).toBeLessThanOrEqual(2);
+    expect(askBox.y, `${width}px ask box sits inside the bar`).toBeGreaterThanOrEqual(headerBottom);
+    await ask.fill("压缩后仍可提问");
+    await expect(ask).toHaveValue("压缩后仍可提问");
+
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect(hero).not.toHaveAttribute("data-collapsed", "");
+    await expect(title).toHaveCSS("opacity", "1");
+  }
+});

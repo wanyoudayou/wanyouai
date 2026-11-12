@@ -434,10 +434,12 @@ export function MediaPicker({
   onSelect,
   disabled,
   label = "从素材库选择",
+  size,
 }: {
   onSelect: (asset: MediaAsset) => void;
   disabled?: boolean;
   label?: string;
+  size?: "sm";
 }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -449,7 +451,7 @@ export function MediaPicker({
       }}
     >
       <Dialog.Trigger asChild>
-        <Button type="button" variant="outline" disabled={disabled}>
+        <Button type="button" variant="outline" size={size} disabled={disabled}>
           <ImageIcon className="size-4" />
           {label}
         </Button>

@@ -13,12 +13,12 @@ const states: Record<
   DeploymentCheck["status"],
   { label: string; tone: StatusBadgeTone }
 > = {
-  ready: { label: "符合条件", tone: "owned" },
+  ready: { label: "符合条件", tone: "success" },
   disabled: { label: "未启用", tone: "free" },
   skipped: { label: "已有站主，免检查", tone: "free" },
-  incomplete: { label: "待配置", tone: "paused" },
-  error: { label: "检查未通过", tone: "paused" },
-  unverified: { label: "待人工验收", tone: "registered" },
+  incomplete: { label: "待配置", tone: "warning" },
+  error: { label: "检查未通过", tone: "danger" },
+  unverified: { label: "待人工验收", tone: "info" },
 };
 
 export function DeploymentChecks({ report }: { report: DeploymentReport }) {

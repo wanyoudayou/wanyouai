@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { InfoIcon, ReceiptIcon } from "lucide-react";
 import { getUserIdentity } from "@/lib/account/session";
+import { loginHref } from "@/lib/account/auth-flow";
 import { getOrderContent } from "@/lib/orders/describe";
 import { OrderContentLink } from "@/components/account/order-content-link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -24,7 +25,7 @@ export default async function OrderDetailPage({ params }: Props) {
   const orderId = Number((await params).id);
   if (!Number.isInteger(orderId) || orderId <= 0) notFound();
   const { user } = await getUserIdentity();
-  if (!user) redirect("/login");
+  if (!user) redirect(loginHref(`/me/orders/${orderId}`));
   const supabase = await createSupabaseServerClient();
   const { data: order } = await supabase.from("orders").select("id,user_id,sku_type,target_id,amount,status,created_at").eq("id", orderId).maybeSingle();
   if (!order || order.user_id !== user.id) notFound();

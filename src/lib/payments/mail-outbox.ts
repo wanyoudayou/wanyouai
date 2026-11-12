@@ -11,7 +11,7 @@ export type MailJob = {
 export type MailHealth = { pending: number; processing: number; sent: number; dead: number; oldest_due_seconds: number };
 export type MailCode = "network" | "provider_retry" | "provider_rejected" | "invalid_response" | "config_changed" | "recipient_missing" | "preparation_failed" | "window_expired" | "attempts_exhausted";
 export type Delivery = { outcome: "sent"; providerId: string } | { outcome: "retry" | "dead"; code: MailCode; providerStatus?: number };
-export type MailConfig = { apiKey: string; from: string; siteUrl: string; fingerprint: string };
+export type MailConfig = { apiKey: string; from: string; siteUrl: string; fingerprint: string; /** 站点时区，用于邮件中的有效期日期。 */ timeZone?: string };
 export function parseMailHealth(value: unknown): MailHealth {
   if (!value || typeof value !== "object") throw new Error("Invalid mail health");
   const data = value as Record<string, unknown>;
@@ -38,10 +38,18 @@ export function outboxConfig(env: Record<string, string | undefined>): MailConfi
   } catch { return null; }
 }
 
+function siteDate(iso: string, timeZone?: string): string {
+  const date = new Date(iso);
+  if (timeZone) {
+    try { return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(date); } catch { /* 回退 UTC */ }
+  }
+  return date.toISOString().slice(0, 10);
+}
+
 export function renderGrantMessage(job: MailJob, to: string, config: MailConfig): GrantMessage {
   const { site_name: siteName, order_id: orderId, description, ends_at: endsAt } = job.snapshot;
   if (job.snapshot.version !== 1) throw new Error("Unsupported mail snapshot");
-  const validity = endsAt ? `有效期至 ${new Date(endsAt).toISOString().slice(0, 10)}` : "永久有效";
+  const validity = endsAt ? `有效期至 ${siteDate(endsAt, config.timeZone)}` : "永久有效";
   const ctaUrl = `${config.siteUrl}/me`;
   return {
     from: config.from, to,

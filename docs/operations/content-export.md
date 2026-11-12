@@ -4,10 +4,10 @@
 
 ## 导出后如何使用
 
-1. 站主在后台点击「导出内容与数据」，解压 ZIP，先读 `EXPORT-INFO.txt`。
+1. 站主在后台「维护 → 数据导出与维护」点击「导出内容与业务数据」，解压 ZIP，先读 `EXPORT-INFO.txt`。
 2. 用 Markdown 编辑器打开 `content/` 中的 `.md` 文件，阅读、编辑或复制正文。头部保存标题、权限、状态和专辑等留存元数据；它不是可直接提交给发布 API 的请求。重新发布需按[发布契约](../contracts/publish-api.md)整理，走原有工作台审核与发布。
 3. 用表格软件的「从文本/CSV 导入」按 UTF-8 打开 `data/` 的 CSV，查看订单、权益和报名记录。邮箱、ID 和 `orders.csv` 的 32 位 `merchant_order_no` 必须按文本读取，避免电子表格把商户编号四舍五入；金额按业务需要转为数值。CSV 用于查询、分析或对账，不用于向系统直接回写订单或授予权益。
-4. `pages/` 提供自定义页 HTML 源码；`site_config.json` 和 `data/raw/` 供人工查阅及开发者分析。`data/raw/media_assets.json` 保留图片目录的名称、替代文字、归档状态和文件引用；不包含图片字节。临时上传记录 `media_uploads` 不导出。不要将包含用户资料或付费内容的包提交到 Git 或公开分享。
+4. `pages/` 提供自定义页 HTML 源码；`site_config.json` 和 `data/raw/` 供人工查阅及开发者分析。`data/raw/nav_items.json` 保存自定义导航（名称、图标、目标与访问级别）。`data/raw/media_assets.json` 保留图片目录的名称、替代文字、归档状态和文件引用；不包含图片字节。临时上传记录 `media_uploads` 不导出。不要将包含用户资料或付费内容的包提交到 Git 或公开分享。
 5. 图片、附件仅保留引用，离线阅读需另存原件。包内不含 Auth 密码/令牌、站点密钥和 Storage 文件原件，没有整包恢复入口。整站事故恢复采用[备份与恢复流程](backup-and-restore.md)。
 
 SKILL 介绍按文章导出；`data/raw/skills.json` 与 `skill_releases.json` 保存价格、当前版本、更新说明、包摘要及文件清单。私有包原件需另行备份 Storage。安装授权、插件发布凭据、上传暂存和私有 Skill 会话不进入内容导出。

@@ -37,11 +37,13 @@ with expected_tables(name) as (values
     ('media_assets'),
     ('media_uploads'),
     ('milestones'),
+    ('nav_items'),
     ('orders'),
     ('payment_events'),
     ('profiles'),
     ('publish_requests'),
     ('registrations'),
+    ('request_limits'),
     ('series'),
     ('services'),
     ('site_config'),
@@ -117,7 +119,7 @@ with expected_tables(name) as (values
     (values ('TRUNCATE'),('TRIGGER'),('REFERENCES'),('MAINTAIN')) privileges(name)
     where has_table_privilege(roles.name,'public.'||quote_ident(tables.name),privileges.name))
   union all select 'application_policy_count', (select count(*) from pg_policy p join pg_class c on c.oid=p.polrelid
-    join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname in (select name from expected_tables))=52
+    join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname in (select name from expected_tables))=53
   union all select 'site_config_singleton', (select count(*)=1 and min(id)=1 from public.site_config)
   union all select 'ai_private_data_denied', not exists(select 1 from
     (values ('anon'),('authenticated')) roles(name) cross join
@@ -168,7 +170,7 @@ with expected_tables(name) as (values
   union all select 'knowledge_source_triggers_enabled', (select count(*)=4 from pg_trigger t join pg_proc p on p.oid=t.tgfoid
     join pg_namespace n on n.oid=p.pronamespace where n.nspname='ai_internal' and p.proname='knowledge_sources_changed' and t.tgenabled='O'
       and t.tgrelid in ('public.articles'::regclass,'public.article_chunks'::regclass,'public.series'::regclass,'public.conversation_publications'::regclass))
-  union all select 'application_schema_version', (select count(*)=1 and min(version)='20261026184628' from public.app_schema_version where id=1)
+  union all select 'application_schema_version', (select count(*)=1 and min(version)='20261112090000' from public.app_schema_version where id=1)
   union all select 'version_api_write_denied', not exists(select 1 from
     (values ('anon'),('authenticated'),('service_role')) roles(name) cross join
     (values ('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('TRIGGER'),('REFERENCES'),('MAINTAIN')) privileges(name)

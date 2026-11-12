@@ -2,23 +2,26 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getUserIdentity } from "@/lib/account/session";
+import { loginHref } from "@/lib/account/auth-flow";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { MeTabs } from "@/components/account/me-tabs";
 import { NicknameEditor } from "@/components/account/nickname-editor";
 import { DAILY_LIMIT } from "@/lib/avatar/answer";
 import { getOrderContents } from "@/lib/orders/describe";
+import { getSiteConfig } from "@/lib/get-site-config";
 
 export const metadata: Metadata = { title: "我的权益", robots: { index: false, follow: false } };
 
 export default async function MePage() {
   const { user } = await getUserIdentity();
-  if (!user) redirect("/login");
+  if (!user) redirect(loginHref("/me"));
   const client = await createSupabaseServerClient();
-  const [entitlements, orders, bookings, registrations] = await Promise.all([
+  const [entitlements, orders, bookings, registrations, site] = await Promise.all([
     client.from("entitlements").select("id,type,target_id,starts_at,ends_at,source").eq("user_id", user.id).is("revoked_at", null).order("created_at", { ascending: false }),
     client.from("orders").select("id,sku_type,target_id,amount,status,created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
     client.from("bookings").select("id,service_id,status,created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
     client.from("registrations").select("id,series_id,status,checkin_token,created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
+    getSiteConfig(),
   ]);
   if (entitlements.error || orders.error || bookings.error || registrations.error) throw new Error("账户数据暂时不可用");
   const serviceIds = [...new Set((bookings.data ?? []).map((b) => b.service_id))];
@@ -58,6 +61,6 @@ export default async function MePage() {
       <NicknameEditor current={profile?.display_name ?? null} />
       <p className="text-xs text-muted-foreground">当前登录：{user.email} · 今日生成（UTC）：{profile?.is_owner ? "日配额不限，站级月限额仍适用" : usageError || usedToday === null ? "配额暂不可用" : `剩余 ${Math.max(0, dailyCap - usedToday)} / ${dailyCap}`}</p>
     </section>
-    <MeTabs subscription={subscription ? { endsAt: subscription.ends_at } : null} entitlements={active} orders={myOrders} bookings={myBookings} registrations={myRegistrations} />
+    <MeTabs subscription={subscription ? { endsAt: subscription.ends_at } : null} entitlements={active} orders={myOrders} bookings={myBookings} registrations={myRegistrations} timezone={site.identity.timezone} currency={site.commerce.subscriptionPrice?.currency ?? "CNY"} />
   </div>;
 }
