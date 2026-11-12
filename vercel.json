@@ -1,0 +1,14 @@
+{
+  "git": {
+    "deploymentEnabled": {
+      "ci/**": false,
+      "feat/system-upgrade-20261016": false
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/expiry-reminder",
+      "schedule": "0 1 * * *"
+    }
+  ]
+}

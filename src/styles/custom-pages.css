@@ -1,0 +1,405 @@
+/* ────────────────────────────────────────────────────────────
+   自定义页面语义类（cp-*）：唯一的自定义样式入口。
+   Tailwind 按需生成，动态 HTML 里的类必须静态存在于此；
+   颜色/间距/圆角全部取自 Design Tokens，不写死色值。
+   ──────────────────────────────────────────────────────────── */
+.cp-section {
+  padding-block: 2.5rem;
+}
+
+/* 编辑预览显示占位提示；公开页面由服务端替换为实时方案。 */
+.cp-pricing:empty::after,
+.cp-subscribe:empty::after {
+  content: "［订阅按钮］";
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border: 1px dashed var(--border);
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+.cp-pricing:empty::after {
+  content: "［实时收费方案：发布后显示当前配置］";
+}
+.cp-section + .cp-section {
+  border-top: 1px solid var(--border);
+  margin-top: 1rem;
+}
+/* 垂直节奏：非栅格 section 的子元素之间统一留距——
+   徽章↔标题、副标题↔CTA、小字↔列表/栅格等不再依赖 UA 默认外边距。 */
+.cp-section:not(.cp-grid-2):not(.cp-grid-3) > * + * {
+  margin-top: 18px;
+}
+.cp-grid-2 {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+.cp-grid-3 {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 640px) {
+  .cp-grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .cp-grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.cp-stack > * + * {
+  margin-top: 1rem;
+}
+.cp-center {
+  text-align: center;
+}
+
+.cp-muted {
+  color: var(--muted-foreground);
+}
+.cp-small {
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.cp-callout {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  background: var(--muted);
+}
+.cp-callout > * + * {
+  margin-top: 0.5rem;
+}
+.cp-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.15rem 0.65rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+.cp-figure {
+  margin: 0;
+}
+.cp-figure figcaption {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+.cp-img {
+  border-radius: var(--radius-lg);
+  max-width: 100%;
+  height: auto;
+}
+.cp-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin-block: 2rem;
+}
+.cp-list-check {
+  list-style: none;
+  padding-left: 0;
+}
+.cp-list-check li {
+  position: relative;
+  padding-left: 1.5rem;
+}
+.cp-list-check li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.45em;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: var(--primary);
+}
+.cp-list-check li + li {
+  margin-top: 0.4rem;
+}
+.cp-tint {
+  background: var(--muted);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+}
+.cp-inverse {
+  background: var(--foreground);
+  color: var(--background);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+}
+.cp-tint > * + *,
+.cp-inverse > * + * {
+  margin-top: 0.75rem;
+}
+.cp-inverse .cp-muted,
+.cp-inverse .cp-lead,
+.cp-inverse .cp-small {
+  color: color-mix(in oklab, var(--background) 70%, transparent);
+}
+
+/* 卡片型内容（自定义页/名片区通用）：全图链接卡、社交媒体卡 */
+.cp-link-cover {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--card);
+  text-decoration: none;
+  color: inherit;
+}
+.cp-link-cover:hover {
+  box-shadow: var(--shadow-sm, 0 1px 2px rgb(0 0 0 / 0.06));
+}
+/* 整图无边距（参考 dinq 照片卡）：图即链接；图片保持原始比例不裁切 */
+.cp-link-cover img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 0;
+}
+.cp-link-cover .cp-link-cover-body {
+  padding: 0.75rem 1rem;
+}
+.cp-link-cover .cp-link-cover-body .cp-h3 {
+  margin: 0;
+}
+.cp-social {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.cp-social a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.8125rem;
+  text-decoration: none;
+  color: inherit;
+}
+.cp-social a:hover {
+  background: var(--muted);
+}
+.cp-social-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  background: var(--foreground);
+  color: var(--background);
+  font-size: 0.625rem;
+  font-weight: 600;
+  padding-inline: 0.25rem;
+}
+
+/* The same semantic hierarchy is shared by edited and AI-generated pages. */
+.custom-html-body .cp-section {
+  padding-block: 36px;
+}
+.custom-html-body .cp-section > :is(.cp-h1, .cp-h2, .cp-lead) {
+  margin-inline: auto;
+}
+.custom-html-body .cp-h1 {
+  max-width: 720px;
+  font-size: clamp(30px, 4vw, 40px);
+  line-height: 1.3;
+  font-weight: 700;
+  text-wrap: balance;
+}
+.custom-html-body .cp-h2 {
+  max-width: 720px;
+  font-size: 26px;
+  line-height: 1.35;
+  font-weight: 700;
+  text-wrap: balance;
+}
+.custom-html-body .cp-h3 {
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 700;
+}
+.custom-html-body .cp-lead {
+  max-width: 620px;
+  font-size: 15px;
+  line-height: 1.7;
+}
+.custom-html-body .cp-grid-2,
+.custom-html-body .cp-grid-3 {
+  gap: 16px;
+}
+.custom-html-body .cp-card {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 13px;
+  padding: 22px;
+  border: 0;
+  border-radius: var(--opc-card-radius);
+  background: var(--opc-card-fallback);
+  color: var(--card-foreground);
+  box-shadow: none;
+}
+.custom-html-body .cp-card > * + * {
+  margin-top: 0;
+}
+.custom-html-body .cp-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: var(--opc-card-stroke) solid var(--opc-card-border);
+  border-radius: inherit;
+}
+@supports (backdrop-filter: blur(1px)) {
+  .custom-html-body .cp-card {
+    background: var(--opc-card-surface);
+    backdrop-filter: blur(var(--opc-card-blur));
+  }
+}
+.custom-html-body a.cp-card {
+  color: inherit;
+  text-decoration: none;
+  transition:
+    background-color var(--opc-card-transition) ease,
+    box-shadow var(--opc-card-transition) ease;
+}
+.custom-html-body a.cp-card:is(:hover, :focus-visible) {
+  box-shadow: var(--opc-hover-glow);
+}
+.custom-html-body a.cp-card:is(:hover, :focus-visible) .cp-h3 {
+  color: var(--primary);
+}
+@supports (mask-composite: exclude) {
+  .custom-html-body a.cp-card::before {
+    padding: var(--opc-card-stroke);
+    border: 0;
+    background: var(--opc-card-border);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+  }
+  .custom-html-body a.cp-card:is(:hover, :focus-visible, :active)::before {
+    background: linear-gradient(
+      40deg,
+      var(--opc-auroraFrom),
+      var(--opc-auroraTo)
+    );
+  }
+  .custom-html-body a.cp-card:active::before {
+    padding: 2px;
+  }
+}
+.custom-html-body a.cp-card:active {
+  background: var(--opc-card-surface-pressed);
+  box-shadow: var(--opc-active-press);
+}
+.custom-html-body .cp-icon {
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--primary);
+}
+.custom-html-body .cp-icon > svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 2;
+}
+.custom-html-body :is(.cp-cta, .cp-cta-secondary) {
+  gap: 8px;
+  min-height: 42px;
+  padding: 11px 22px;
+  border-radius: var(--opc-radius-pill);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.custom-html-body .cp-cta {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.custom-html-body .cp-cta-secondary {
+  background: transparent;
+  border: 1.5px solid var(--primary);
+  color: var(--primary);
+}
+.custom-html-body :is(.cp-cta, .cp-cta-secondary) .cp-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+}
+.custom-html-body :is(.cp-cta, .cp-cta-secondary) .cp-icon > svg {
+  width: 16px;
+  height: 16px;
+}
+.custom-html-body .cp-center > :is(.cp-cta, .cp-cta-secondary) {
+  margin: 8px 4px 0;
+}
+@media (max-width: 767px) {
+  .custom-html-body .cp-section {
+    padding-block: 28px;
+  }
+  .custom-html-body .cp-h2 {
+    font-size: 22px;
+  }
+}
+
+.custom-html-body .cp-lead {
+  color: var(--muted-foreground);
+}
+.custom-html-body :is(.cp-cta, .cp-cta-secondary) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  text-align: center;
+}
+.custom-html-body .cp-cta:hover {
+  box-shadow: var(--opc-hover-glow);
+}
+.custom-html-body :is(.cp-cta, .cp-cta-secondary):active {
+  box-shadow: var(--opc-active-press);
+}
+.custom-html-body .cp-inverse {
+  --background: var(--opc-inverse-background);
+  --foreground: var(--opc-inverse-foreground);
+  --muted: var(--opc-inverse-muted);
+  --muted-foreground: var(--opc-inverse-muted-foreground);
+  --primary: var(--opc-inverse-primary);
+  --primary-foreground: var(--opc-inverse-primary-foreground);
+  --accent: var(--opc-inverse-accent);
+  --accent-foreground: var(--opc-inverse-accent-foreground);
+  --input: var(--opc-inverse-input);
+  --ring: var(--opc-inverse-ring);
+  --card: var(--opc-inverse-card);
+  --card-foreground: var(--opc-inverse-card-foreground);
+  --opc-card-surface: var(--opc-inverse-card-surface);
+  --opc-card-fallback: var(--opc-inverse-card-fallback);
+  --opc-card-border: var(--opc-inverse-card-border);
+  --opc-card-stroke: var(--opc-inverse-card-stroke);
+  --opc-card-blur: var(--opc-inverse-card-blur);
+  --opc-card-surface-pressed: var(--opc-inverse-card-surface-pressed);
+  background: var(--background);
+  color: var(--foreground);
+}
+.custom-html-body .cp-inverse .cp-muted {
+  color: var(--muted-foreground);
+}

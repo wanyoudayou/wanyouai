@@ -1,0 +1,277 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wanyou.ai/schemas/card-0.1.json",
+  "title": "OPC Card (youai.card/0.2)",
+  "description": "万有AI 实例的机器可读名片。设计纪律：(1) 事实而非命令——只陈述站点接受什么、如何工作，不向来访 Agent 发指令；(2) 声誉不自陈——不包含自评分/自标签式信誉字段，只放指向交易锚定评价的 URL（evidence）；(3) 早期不下形状——focus_areas 等为自由字符串数组，不设枚举；(4) 同源渲染——人类页 /card 与本 JSON 由同一数据源生成。additionalProperties 默认开放，允许实例扩展，未知字段应被消费者忽略。",
+  "type": "object",
+  "required": ["schema", "identity", "protocol", "source_of_truth"],
+  "properties": {
+    "schema": {
+      "const": "youai.card/0.2"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "本文件生成时间（UTC，ISO 8601）"
+    },
+    "identity": {
+      "type": "object",
+      "required": ["name", "display_name", "one_liner", "site"],
+      "properties": {
+        "name": { "type": "string", "description": "OPC 本名或常用名" },
+        "display_name": { "type": "string", "description": "站点展示名（如「陈砚 · 跨境选品一人公司」）" },
+        "one_liner": { "type": "string", "description": "一句话：帮谁、做什么、交付什么" },
+        "site": { "type": "string", "format": "uri", "description": "站点根地址" },
+        "languages": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "服务语言（BCP-47 标签，如 zh-CN、en）"
+        },
+        "timezone": { "type": "string", "description": "IANA 时区，如 Asia/Shanghai" },
+        "focus_areas": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "专注领域，自由标签（刻意不设枚举：早期不下形状）"
+        },
+        "links": {
+          "type": "object",
+          "description": "其他公开入口（键名自定，值为 URL）",
+          "additionalProperties": { "type": "string", "format": "uri" }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "description": "对外可购买/可使用的全部供给",
+      "properties": {
+        "services": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/service" }
+        },
+        "content_offerings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/content_offering" }
+        },
+        "skills": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/skill" }
+        }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "description": "硬约束：工作节奏、容量与不接的事项（事实陈述）",
+      "properties": {
+        "working_hours": { "type": "string" },
+        "response_time": { "type": "string" },
+        "current_load": { "type": "string", "description": "当前容量占用，如「本月 3/4 单」" },
+        "exclusions": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "pricing_policy": {
+      "type": "object",
+      "properties": {
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$", "description": "ISO 4217，如 CNY" },
+        "payment_methods": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["method", "mode"],
+            "properties": {
+              "method": { "type": "string", "description": "在线支付通道，如 zpay / wechat / stripe" },
+              "mode": { "enum": ["online"], "description": "online = 支付成功自动开通权益" },
+              "note": { "type": "string" }
+            }
+          }
+        },
+        "refund_policy_url": { "type": "string", "format": "uri" }
+      }
+    },
+    "protocol": {
+      "type": "object",
+      "description": "如何与本站点交互——陈述「我接受什么」，不发指令",
+      "required": ["inquiry", "human_channel"],
+      "properties": {
+        "inquiry": {
+          "type": "object",
+          "required": ["accepted_fields"],
+          "properties": {
+            "endpoint": { "type": "string", "format": "uri", "description": "结构化询价提交地址" },
+            "accepted_fields": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "询价接受的事实字段名，如 intent / budget_range / deadline / context_links"
+            },
+            "note": { "type": "string" }
+          }
+        },
+        "human_channel": {
+          "type": "object",
+          "properties": {
+            "booking_url": { "type": "string", "format": "uri" },
+            "email": { "type": "string", "format": "email" }
+          }
+        },
+        "escalation": {
+          "type": "string",
+          "description": "人类确认边界，如「所有订单最终由本人确认；agent 可完成信息交换与材料准备」"
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "description": "实证层——声誉只放指针，不自陈",
+      "properties": {
+        "evaluations_url": { "type": "string", "format": "uri", "description": "交易锚定评价页" },
+        "evaluations_note": { "type": "string", "description": "评价资格说明，如「仅已完成订单的交易对手可评」" },
+        "recent_work": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["title", "url"],
+            "properties": {
+              "title": { "type": "string" },
+              "url": { "type": "string", "format": "uri" },
+              "date": { "type": "string", "format": "date" }
+            }
+          }
+        }
+      }
+    },
+    "source_of_truth": {
+      "type": "string",
+      "description": "声明本文件与人类页同源（含对应人类页地址）"
+    }
+  },
+  "$defs": {
+    "price": {
+      "type": "object",
+      "required": ["amount", "currency"],
+      "properties": {
+        "amount": { "type": "number", "minimum": 0 },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "model": {
+          "type": "string",
+          "description": "计价模式。常见：per_project / per_hour / per_month / per_year / lifetime。刻意不设枚举（早期不下形状），消费方应按字符串原样展示"
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "required": ["id", "name", "deliverables", "price"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "deliverables": { "type": "array", "items": { "type": "string" }, "description": "可验收的交付物清单" },
+        "duration": { "type": "string", "description": "工期，如「5 个工作日」" },
+        "price": { "$ref": "#/$defs/price" },
+        "agreement_url": { "type": "string", "format": "uri", "description": "六要素协议页" },
+        "inquiry_endpoint": { "type": "string", "format": "uri", "description": "询价提交端点：POST JSON {slug, intent, budget_range?, deadline?, context_links?, contact_email?}" },
+        "capacity": { "type": "string", "description": "容量，如「每月 4 单」" }
+      }
+    },
+    "content_offering": {
+      "type": "object",
+      "required": ["type", "title", "access"],
+      "properties": {
+        "type": { "enum": ["series", "single"], "description": "series = 专辑（手册集），single = 独立付费文章" },
+        "title": { "type": "string" },
+        "access": {
+          "enum": ["free", "registered", "subscriber", "paid-series", "paid-single", "paid-skill"],
+          "description": "与 /llms.txt 的访问级别标记一致"
+        },
+        "url": { "type": "string", "format": "uri" },
+        "price": { "$ref": "#/$defs/price" },
+        "includes_future_updates": { "type": "boolean", "description": "专辑购买是否含后续更新（默认 true）" }
+      }
+    },
+    "skill": {
+      "type": "object",
+      "required": ["title", "access", "url"],
+      "properties": {
+        "title": { "type": "string" },
+        "access": { "enum": ["free", "registered", "subscriber", "paid-series", "paid-single", "paid-skill"] },
+        "url": { "type": "string", "format": "uri", "description": "README 页（始终公开）" },
+        "download_url": { "type": "string", "format": "uri", "description": "文件包下载（权益校验后生效）" }
+      }
+    }
+  },
+  "examples": [
+    {
+      "schema": "youai.card/0.2",
+      "generated_at": "2026-09-01T09:00:00+08:00",
+      "identity": {
+        "name": "陈砚",
+        "display_name": "陈砚 · 跨境选品一人公司",
+        "one_liner": "帮中小卖家做跨境选品与独立站冷启动，交付选品报告与运营方案",
+        "site": "https://example.com",
+        "languages": ["zh-CN", "en"],
+        "timezone": "Asia/Shanghai",
+        "focus_areas": ["跨境电商", "选品", "独立站冷启动"]
+      },
+      "capabilities": {
+        "services": [
+          {
+            "id": "svc-product-research",
+            "name": "跨境选品诊断",
+            "deliverables": ["选品报告 PDF", "竞品清单表格", "30 分钟讲解通话"],
+            "duration": "5 个工作日",
+            "price": { "amount": 1500, "currency": "CNY", "model": "per_project" },
+            "agreement_url": "https://example.com/services/svc-product-research#agreement",
+            "capacity": "每月 4 单"
+          }
+        ],
+        "content_offerings": [
+          {
+            "type": "series",
+            "title": "选品方法论（12 篇）",
+            "access": "paid-series",
+            "url": "https://example.com/playbooks/picking-method",
+            "price": { "amount": 199, "currency": "CNY" },
+            "includes_future_updates": true
+          }
+        ],
+        "skills": [
+          {
+            "title": "选品评分卡模板",
+            "access": "free",
+            "url": "https://example.com/skills/picking-scorecard"
+          }
+        ]
+      },
+      "constraints": {
+        "working_hours": "周一至周五 10:00–18:00 (Asia/Shanghai)",
+        "response_time": "工作日 24 小时内",
+        "current_load": "本月 3/4 单",
+        "exclusions": ["不接受代运营", "不承诺销量"]
+      },
+      "pricing_policy": {
+        "currency": "CNY",
+        "payment_methods": [
+          { "method": "zpay", "mode": "online", "note": "在线支付，支付成功自动开通权益" }
+        ],
+        "refund_policy_url": "https://example.com/legal/refund"
+      },
+      "protocol": {
+        "inquiry": {
+          "endpoint": "https://example.com/api/inquiry",
+          "accepted_fields": ["intent", "budget_range", "deadline", "context_links"],
+          "note": "询价按上述字段提交，工作日 24 小时内回复"
+        },
+        "human_channel": {
+          "booking_url": "https://example.com/services#book",
+          "email": "hello@example.com"
+        },
+        "escalation": "所有订单最终由本人确认后生效；agent 可完成信息交换与材料准备"
+      },
+      "evidence": {
+        "evaluations_url": "https://example.com/evaluations",
+        "evaluations_note": "评价仅来自已完成订单的交易对手",
+        "recent_work": [
+          { "title": "案例：宠物用品独立站冷启动", "url": "https://example.com/blog/pet-supplies-case", "date": "2026-05-12" }
+        ]
+      },
+      "source_of_truth": "本文件由站内数据渲染，人类可读页面 https://example.com/card 与此同源"
+    }
+  ]
+}

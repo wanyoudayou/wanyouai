@@ -1,0 +1,30 @@
+# Local credentials and machine-only state must never enter a CLI upload.
+.env*
+.vercel/
+.next/
+node_modules/
+.git/
+.agents/
+.codex/
+
+# Review evidence and database test identities are not application assets.
+docs/review-evidence/
+supabase/tests/
+tests/
+
+# Local logs, private keys and temporary archives.
+*.log
+*.pem
+*.key
+*.p12
+*.tgz
+
+.local-archive/
+dist/
+releases/
+.aws/
+
+test-results/
+playwright-report/
+playwright.config.ts
+content/starter/

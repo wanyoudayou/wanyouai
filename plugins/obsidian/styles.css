@@ -1,0 +1,49 @@
+.wanyou-handbooks { max-width: 900px; margin: 0 auto; padding: 24px; }
+.wanyou-handbooks details { margin: 12px 0; padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); }
+.wanyou-handbooks summary { cursor: pointer; overflow-wrap: anywhere; }
+.wanyou-handbooks pre { max-height: 300px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.wanyou-handbooks [role=status] { padding: 12px; background: var(--background-secondary); border-radius: var(--radius-m); }
+.opc-handbook-row { padding: 16px; margin: 12px 0; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); }
+.opc-handbook-row.is-selected { border-color: var(--interactive-accent); }
+.opc-handbook-row > summary { display: list-item; }
+.opc-handbook-row > summary > span:not(.opc-handbook-title) { display: block; margin: 8px 0 0 20px; }
+.opc-handbook-title { color: var(--text-normal); font-size: var(--font-ui-large); font-weight: var(--font-semibold); }
+.opc-handbook-path { color: var(--text-muted); font-size: var(--font-smallest); overflow-wrap: anywhere; }
+.opc-handbook-state { color: var(--text-normal); }
+.opc-handbook-error { color: var(--text-error); overflow-wrap: anywhere; }
+.opc-handbook-problem { border-color: var(--text-error) !important; }
+.opc-handbook-actions { border: 0; flex-wrap: wrap; gap: 8px; padding-bottom: 0; }
+.opc-handbook-actions .setting-item-info:empty { display: none; }
+.opc-handbook-actions .setting-item-control { flex-wrap: wrap; justify-content: flex-start; }
+.opc-handbook-detail { margin-top: 16px; padding-top: 8px; border-top: 1px solid var(--background-modifier-border); }
+.opc-handbook-detail [role=status]:empty { display: none; }
+.opc-handbook-folder-list { max-height: 50vh; overflow: auto; }
+.opc-handbook-comparison { overflow-x: auto; }
+.opc-handbook-comparison table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.opc-handbook-comparison th, .opc-handbook-comparison td { padding: 10px; border: 1px solid var(--background-modifier-border); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.opc-handbook-comparison .setting-item { display: block; }
+.opc-handbook-difference td { background: var(--background-secondary); }
+.opc-handbook-diff { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.opc-handbook-diff > div { min-width: 0; }
+@media (max-width: 600px) { .wanyou-handbooks { padding: 12px; } .opc-handbook-comparison th, .opc-handbook-comparison td { padding: 6px; } }
+
+/* Follow the host theme; hierarchy comes from spacing, not nested colored panels. */
+.wanyou-handbooks { max-width: 1080px; color: var(--text-normal); line-height: 1.55; }
+.wanyou-handbooks > h2 { margin: 0 0 8px; }
+.wanyou-handbooks > p { color: var(--text-muted); }
+.wanyou-handbooks .opc-handbook-row { padding: 0; overflow: clip; background: var(--background-primary); }
+.opc-handbook-row > summary { padding: 18px 20px; list-style-position: inside; }
+.opc-handbook-row > summary:hover { background: var(--background-primary-alt); }
+.opc-handbook-row > summary:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -3px; }
+.opc-handbook-detail { margin: 0; padding: 16px 20px 20px; }
+.opc-handbook-actions .setting-item-control { justify-content: flex-start; gap: 8px; }
+.opc-handbook-actions button { white-space: normal; height: auto; min-height: 32px; padding: 6px 12px; }
+.opc-handbook-steps { display: flex; gap: 8px; padding: 0; margin: 0 0 16px; list-style: none; font-size: var(--font-small); }
+.opc-handbook-steps li { flex: 1; color: var(--text-muted); padding: 8px 0; border-bottom: 2px solid var(--background-modifier-border); }
+.opc-handbook-steps .is-current { color: var(--text-normal); border-color: var(--interactive-accent); font-weight: var(--font-semibold); }
+.opc-handbook-steps .is-complete { color: var(--text-normal); }
+.opc-handbook-comparison thead { background: var(--background-secondary); }
+.opc-handbook-comparison td:first-child { font-weight: var(--font-medium); }
+.opc-handbook-comparison details { border: 0; margin: 0; padding: 4px; }
+.opc-handbook-diff pre { padding: 12px; background: var(--background-primary-alt); border-radius: var(--radius-s); font-size: var(--font-smallest); }
+@media (max-width: 600px) { .opc-handbook-detail { padding: 12px; } .opc-handbook-row > summary { padding: 14px 12px; } .opc-handbook-diff { grid-template-columns: minmax(0,1fr); } }

@@ -1,0 +1,9 @@
+{
+  "id": "wanyou-handbooks",
+  "name": "OPC手册管理器",
+  "version": "1.4.1",
+  "minAppVersion": "1.14.4",
+  "description": "将本地手册和引用图片上传为草稿，在网页后台设置与发布。",
+  "author": "万有AI",
+  "isDesktopOnly": true
+}

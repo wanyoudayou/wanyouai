@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="700" viewBox="0 0 1600 700" fill="none">
+  <defs>
+    <radialGradient id="sky" cx=".42" cy=".22" r=".85"><stop stop-color="#FFFFFF"/><stop offset=".56" stop-color="#EDEAFF"/><stop offset="1" stop-color="#DCD7FF"/></radialGradient>
+    <linearGradient id="aurora" x1="700" y1="640" x2="1600" y2="180" gradientUnits="userSpaceOnUse"><stop stop-color="#7C6CFF" stop-opacity="0"/><stop offset=".5" stop-color="#7C6CFF" stop-opacity=".22"/><stop offset="1" stop-color="#2DD4BF" stop-opacity=".28"/></linearGradient>
+    <linearGradient id="line" x1="800" y1="660" x2="1620" y2="120" gradientUnits="userSpaceOnUse"><stop stop-color="#7C6CFF" stop-opacity="0"/><stop offset="1" stop-color="#7C6CFF" stop-opacity=".38"/></linearGradient>
+    <filter id="cloud"><feGaussianBlur stdDeviation="32"/></filter>
+  </defs>
+  <path fill="url(#sky)" d="M0 0h1600v700H0z"/>
+  <ellipse cx="350" cy="130" rx="530" ry="220" fill="#FFFFFF" fill-opacity=".8" filter="url(#cloud)"/>
+  <path d="M530 700C780 680 1100 520 1230 350s260-230 370-230v580Z" fill="url(#aurora)"/>
+  <g stroke="url(#line)" stroke-width="1.2"><path d="M590 730c340-60 540-230 690-410s220-180 380-200"/><path d="M680 740c300-60 520-210 660-400s220-180 350-190"/><path d="M790 750c300-70 500-230 620-370s220-180 350-190"/></g>
+  <path d="M0 624c330-105 480 160 820 56s540-65 780-240v260H0Z" fill="#FFFFFF" fill-opacity=".24"/>
+</svg>

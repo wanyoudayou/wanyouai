@@ -1,0 +1,46 @@
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies / build output
+# User-installable Obsidian ZIP and checksum are tracked under releases/obsidian/.
+node_modules/
+.next/
+out/
+dist/
+build/
+
+# Local system files
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# TypeScript incremental build
+*.tsbuildinfo
+
+# Vercel local metadata
+.vercel
+
+# Supabase CLI runtime state
+supabase/.temp/
+supabase/.branches/
+
+# Local archives and machine-only agent configuration
+.local-archive/
+.codex/
+.aws/
+
+# Browser regression artifacts and isolated fixture runtime
+test-results/
+playwright-report/
+tests/browser/fixture/.next/
+tests/browser/fixture/public/
+tests/browser/fixture/next-env.d.ts
+tests/browser/fixture/AGENTS.md
+tests/browser/fixture/CLAUDE.md

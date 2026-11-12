@@ -1,0 +1,303 @@
+/* Content cards: full-width cover, compact body, shared surface and states. */
+.opc-content-link {
+  display: block;
+  min-width: 0;
+  height: 100%;
+  border-radius: var(--opc-card-radius);
+  color: inherit;
+  text-decoration: none;
+}
+.opc-content-card {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: var(--opc-card-radius);
+  background: var(--opc-card-fallback);
+  box-shadow: none;
+  transition:
+    background-color var(--opc-card-transition) ease,
+    box-shadow var(--opc-card-transition) ease;
+}
+@supports (backdrop-filter: blur(1px)) {
+  .opc-content-card {
+    background: var(--opc-card-surface);
+    backdrop-filter: blur(var(--opc-card-blur));
+  }
+}
+/* Draw every stroke inside the surface; state changes never change its size. */
+.opc-content-card::before,
+.opc-content-card::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.opc-content-card::before {
+  border: var(--opc-card-stroke) solid var(--opc-card-border);
+}
+@supports (mask-composite: exclude) {
+  .opc-content-card::before {
+    padding: var(--opc-card-stroke);
+    border: 0;
+    background: var(--opc-card-border);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+  }
+}
+.opc-content-card-cover {
+  position: relative;
+  flex: 0 0 auto;
+  height: var(--opc-card-cover-height);
+  overflow: hidden;
+  background: linear-gradient(
+    150deg,
+    var(--opc-card-cover-from),
+    var(--opc-card-cover-to)
+  );
+}
+.opc-content-card-image,
+.opc-content-card-placeholder {
+  width: 100%;
+  height: 100%;
+}
+.opc-content-card-image {
+  display: block;
+  object-fit: cover;
+}
+.opc-content-card-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--opc-card-cover-icon);
+}
+.opc-content-card-placeholder::before {
+  content: "";
+  position: absolute;
+  inset: 24% -12%;
+  border: 1px solid color-mix(in srgb, var(--opc-primary) 20%, transparent);
+  border-radius: var(--opc-radius-xl);
+  transform: rotate(-22deg);
+}
+.opc-content-card-chip {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: inline-flex;
+  max-width: calc(100% - 20px);
+  overflow: hidden;
+  padding: 4px 9px;
+  border-radius: var(--opc-radius-pill);
+  background: var(--opc-card-chip-background);
+  color: var(--opc-card-chip-foreground);
+  font-size: 0.65625rem;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition:
+    background-color var(--opc-card-transition) ease,
+    color var(--opc-card-transition) ease;
+}
+.opc-content-card-body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--opc-card-body-padding);
+}
+.opc-content-card-heading {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: 6px 8px;
+}
+.opc-content-card-title {
+  min-width: 0;
+  flex: 1 1 9rem;
+  color: var(--foreground);
+  font-family: var(--opc-font-body);
+  font-size: var(--opc-card-title-size);
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  transition: color var(--opc-card-transition) ease;
+}
+.opc-content-card-heading > [data-slot="badge"] {
+  margin-top: 1px;
+  font-size: 0.65625rem;
+}
+.opc-content-card-summary {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: var(--opc-card-summary-size);
+  line-height: 1.7;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+.opc-content-card-meta {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  color: var(--muted-foreground);
+  font-size: var(--opc-card-meta-size);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.opc-content-card-meta > span {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+.opc-content-card-meta svg {
+  flex-shrink: 0;
+}
+.opc-content-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+.opc-content-card-action {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 3px;
+  color: var(--muted-foreground);
+  font-size: var(--opc-card-meta-size);
+  font-weight: 700;
+  line-height: 1.6;
+  transition: color var(--opc-card-transition) ease;
+}
+.opc-content-card-action > span {
+  opacity: 0;
+  transition: opacity var(--opc-card-transition) ease;
+}
+.opc-content-card-action > svg {
+  transition: transform var(--opc-card-transition) ease;
+}
+.opc-content-card-tags {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+}
+.opc-content-card-tags > [data-slot="badge"] {
+  max-width: 100%;
+  color: var(--muted-foreground);
+  font-size: var(--opc-card-meta-size);
+  font-weight: 400;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.opc-content-card-manifest {
+  position: absolute;
+  inset: 39px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  color: var(--foreground);
+  font-family: var(--opc-font-mono);
+  font-size: var(--opc-card-meta-size);
+  line-height: 1.4;
+}
+.opc-content-card-manifest > li {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+.opc-content-link:is(:hover, :focus-visible, :active) > .opc-content-card {
+  box-shadow: var(--opc-hover-glow);
+}
+.opc-content-link:is(:hover, :focus-visible, :active)
+  > .opc-content-card::before {
+  border-color: var(--primary);
+}
+@supports (mask-composite: exclude) {
+  .opc-content-link:is(:hover, :focus-visible, :active)
+    > .opc-content-card::before {
+    background: linear-gradient(
+      40deg,
+      var(--opc-auroraFrom),
+      var(--opc-auroraTo)
+    );
+  }
+}
+.opc-content-link:is(:hover, :focus-visible, :active) .opc-content-card-title,
+.opc-content-link:is(:hover, :focus-visible, :active) .opc-content-card-action {
+  color: var(--primary);
+}
+.opc-content-link:is(:hover, :focus-visible, :active) .opc-content-card-chip {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.opc-content-link:is(:hover, :focus-visible, :active)
+  .opc-content-card-action
+  > span {
+  opacity: 1;
+}
+.opc-content-link:is(:hover, :focus-visible, :active)
+  .opc-content-card-action
+  > svg {
+  transform: translateX(2px);
+}
+.opc-content-link:active > .opc-content-card {
+  --opc-card-stroke: 2px;
+  background: var(--opc-card-surface-pressed);
+  box-shadow: none;
+}
+.opc-content-link:active > .opc-content-card::before {
+  border-width: 2px;
+}
+@supports (mask-composite: exclude) {
+  .opc-content-link:active > .opc-content-card::before {
+    padding: 2px;
+    border-width: 0;
+  }
+}
+.opc-content-link:active > .opc-content-card::after {
+  box-shadow: var(--opc-active-press);
+}
+/* Keyboard focus is an accessibility addition to the three pointer-state designs. */
+.opc-content-link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+}
+@media (hover: none) {
+  .opc-content-card-action > span {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .opc-content-card,
+  .opc-content-card-chip,
+  .opc-content-card-title,
+  .opc-content-card-action,
+  .opc-content-card-action > * {
+    transition: none;
+  }
+  .opc-content-link .opc-content-card-action > svg {
+    transform: none;
+  }
+}

@@ -1,0 +1,577 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wanyou.ai/schemas/site-config-0.1.json",
+  "title": "万有AI site_config JSON fields",
+  "description": "Contracts for the JSONB columns in site_config. The SQL row also contains scalar site fields.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "identity",
+    "constraints",
+    "home_config",
+    "contact",
+    "commerce"
+  ],
+  "properties": {
+    "turnstile_config": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["enabled", "site_key"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "site_key": { "type": "string", "maxLength": 200 }
+      },
+      "$comment": "公开的人机校验开关和 Site Key；Secret Key 只存私有 site_secrets。NULL 仅保留已有环境配置的显式迁移通道。"
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "one_liner",
+        "languages",
+        "timezone",
+        "focus_areas"
+      ],
+      "properties": {
+        "one_liner": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "languages": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})?$"
+          }
+        },
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "$comment": "Must be a valid IANA time zone identifier; application validation rejects invalid values."
+        },
+        "focus_areas": {
+          "type": "array",
+          "maxItems": 12,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          }
+        },
+        "logo_url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 2048,
+          "$comment": "站点 Logo（左栏标识）；https 绝对地址或站内相对路径。缺省时前台退化为站名首字徽标。"
+        },
+        "avatar_url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 2048,
+          "$comment": "站主头像（右栏名片与 /card）；https 绝对地址或站内相对路径。缺省时前台退化为站主名称首字徽标。"
+        },
+        "social_links": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "platform",
+              "label",
+              "url"
+            ],
+            "properties": {
+              "platform": {
+                "type": "string",
+                "enum": [
+                  "x",
+                  "github",
+                  "xiaohongshu",
+                  "xiaoyuzhou",
+                  "wechat-official",
+                  "custom"
+                ]
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40
+              },
+              "url": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048,
+                "anyOf": [
+                  {
+                    "format": "uri"
+                  },
+                  {
+                    "pattern": "^\\/"
+                  }
+                ]
+              },
+              "note": {
+                "type": "string",
+                "maxLength": 80
+              }
+            }
+          },
+          "$comment": "自媒体平台露出（名片「实证」区）：预设平台 x / github / xiaohongshu（小红书）/ xiaoyuzhou（小宇宙）/ wechat-official（公众号）/ custom；逐条添加。"
+        },
+        "custom_zone": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "html"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "html": {
+              "type": "string",
+              "maxLength": 200000
+            }
+          },
+          "$comment": "名片页自定义区（履历主体之后）；html 保存时已按自定义页同一管线白名单净化。"
+        },
+        "show_subscription_card": {
+          "type": "boolean",
+          "default": true,
+          "$comment": "名片页是否显示订阅方案卡片（左列 profile 下方）；缺省 true。"
+        }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "working_hours",
+        "response_time",
+        "current_load",
+        "exclusions"
+      ],
+      "properties": {
+        "working_hours": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "response_time": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "current_load": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "exclusions": {
+          "type": "array",
+          "maxItems": 30,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        }
+      }
+    },
+    "home_config": {
+      "$ref": "#/$defs/home_config"
+    },
+    "contact": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "booking_url": {
+          "type": "string",
+          "format": "uri",
+          "$comment": "历史外链字段，兼容保留；新配置请用 booking_page。"
+        },
+        "booking_page": {
+          "type": "string",
+          "maxLength": 61,
+          "pattern": "^([a-z0-9][a-z0-9-]{0,60})?$",
+          "$comment": "预约页面 = 自定义页 slug（/p/{slug}）；空字符串 = 未配置。"
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "email"
+          ]
+        },
+        {
+          "required": [
+            "booking_page"
+          ]
+        },
+        {
+          "required": [
+            "booking_url"
+          ]
+        }
+      ]
+    },
+    "commerce": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "payment_enabled",
+        "subscription_price",
+        "refund_policy_page"
+      ],
+      "properties": {
+        "payment_enabled": {
+          "type": "boolean"
+        },
+        "payment_channels": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 2,
+          "items": {
+            "type": "string",
+            "enum": [
+              "alipay",
+              "wxpay"
+            ]
+          },
+          "$comment": "Enabled zpay cashier channels; buyer picks one on the checkout page. Merchant must have opened the channel in zpay."
+        },
+        "subscription_price": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "amount",
+            "currency",
+            "model"
+          ],
+          "properties": {
+            "amount": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "currency": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            "model": {
+              "const": "per_year"
+            }
+          },
+          "$comment": "null = 未开通年度订阅；与在线收款开关独立，可只销售单篇、专辑或活动。已配置价格必须大于零。"
+        },
+        "refund_policy_url": {
+          "type": "string",
+          "anyOf": [
+            {
+              "const": ""
+            },
+            {
+              "format": "uri"
+            }
+          ],
+          "$comment": "历史外链字段，兼容保留；新配置请用 refund_policy_page。"
+        },
+        "refund_policy_page": {
+          "type": "string",
+          "maxLength": 61,
+          "pattern": "^([a-z0-9][a-z0-9-]{0,60})?$",
+          "$comment": "退款政策页面 = 自定义页 slug（/p/{slug}）；空字符串 = 未配置（页脚与支付页不显示退款政策入口）。"
+        },
+        "subscribe_page": {
+          "type": "string",
+          "maxLength": 61,
+          "pattern": "^([a-z0-9][a-z0-9-]{0,60})?$",
+          "$comment": "左栏订阅 pill 落点：空字符串 = 默认名片页（/card#pricing）；自定义页 slug = /p/{slug}#pricing（页内需含 cp-subscribe 占位符，渲染时自带 #pricing 锚点）。"
+        }
+      }
+    },
+    "avatar_config": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "knowledge_ready": {
+          "type": "boolean",
+          "description": "服务端生成的知识库就绪标识；不由站主直接编辑。"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "monthly_limit": {
+          "type": "number",
+          "minimum": 0
+        },
+        "anonymous_entry": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  },
+  "$defs": {
+    "home_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "enabled"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "blog",
+            "handbook",
+            "skill",
+            "event",
+            "service"
+          ]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "empty_text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "cta_label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 24
+        }
+      }
+    },
+    "fact_badge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "series_count",
+            "article_count",
+            "subscription_price",
+            "service_capacity"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        }
+      }
+    },
+    "home_config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "blocks",
+        "hero",
+        "fact_badges"
+      ],
+      "properties": {
+        "blocks": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/home_block"
+          },
+          "uniqueItems": true
+        },
+        "hero": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ask_placeholder"
+          ],
+          "properties": {
+            "ask_placeholder": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "banner_url": {
+              "type": "string",
+              "maxLength": 2048,
+              "anyOf": [
+                {
+                  "format": "uri"
+                },
+                {
+                  "pattern": "^\\/"
+                }
+              ],
+              "$comment": "兼容既有单张横幅，读取为浅色版；新保存使用 banner_light_url 和 banner_dark_url。",
+              "deprecated": true
+            },
+            "enabled": {
+              "type": "boolean",
+              "$comment": "名片 Hero 是否显示（固定首屏，不参与五块排序）；缺省 true。"
+            },
+            "tone": {
+              "type": "string",
+              "enum": [
+                "light",
+                "dim",
+                "dark"
+              ],
+              "$comment": "仅兼容旧配置；渲染时忽略，新保存不写入。文字与控件自动跟随主题。",
+              "deprecated": true
+            },
+            "banner_light_url": {
+              "type": "string",
+              "maxLength": 2048,
+              "anyOf": [
+                {
+                  "format": "uri"
+                },
+                {
+                  "pattern": "^\\/"
+                }
+              ],
+              "$comment": "浅色模式横幅：https 地址或站内 /assets/... 路径；缺省使用对应模式的内置背景。"
+            },
+            "banner_dark_url": {
+              "type": "string",
+              "maxLength": 2048,
+              "anyOf": [
+                {
+                  "format": "uri"
+                },
+                {
+                  "pattern": "^\\/"
+                }
+              ],
+              "$comment": "深色模式横幅：https 地址或站内 /assets/... 路径；缺省使用对应模式的内置背景。"
+            }
+          }
+        },
+        "fact_badges": {
+          "type": "array",
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/fact_badge"
+          }
+        },
+        "custom_zone": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "html"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "html": {
+              "type": "string",
+              "maxLength": 200000
+            }
+          },
+          "$comment": "首页自定义区（Hero 与五个内容区块之间）；html 保存时已按自定义页同一管线白名单净化。"
+        }
+      },
+      "$comment": "五个内容区块（博客/手册/技能/活动/服务）必须各出现一次；名片 Hero 是固定首屏、不在区块内（hero.enabled 控制显隐）。应用层强制唯一性并对旧类型名做迁移映射（latest_blog/upcoming_events/services → blog/event/service，showcase 取消，identity → hero.enabled）。",
+      "allOf": [
+        {
+          "contains": {
+            "properties": {
+              "type": {
+                "const": "blog"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "properties": {
+              "type": {
+                "const": "handbook"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "properties": {
+              "type": {
+                "const": "skill"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "properties": {
+              "type": {
+                "const": "event"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "properties": {
+              "type": {
+                "const": "service"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

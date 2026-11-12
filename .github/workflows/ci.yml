@@ -1,0 +1,152 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'ci/**', 'feat/**']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  database-concurrency:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.2-pg17@sha256:feb68f4f15446397d8cac7f4fe48fe4586de83160d1fc48b46283312d1a33966
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: local-test-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Real PostgreSQL install, transaction races and recovery
+        run: npm run test:db:concurrency
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:local-test-only@127.0.0.1:5432/postgres
+      - name: Scale correctness and PostgreSQL measurements
+        run: npm run test:scale
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:local-test-only@127.0.0.1:5432/postgres
+
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate contracts
+        run: npm run contracts
+
+      - name: Documentation links
+        run: npm run docs:check
+
+      - name: Configuration preflight rules
+        run: npm run test:config
+
+      - name: Storage setup rules
+        run: npm run test:storage
+
+      - name: Fresh database drill
+        run: npm run drill:fresh-db
+
+      - name: Media recovery transaction guards
+        run: npm run test:db:media
+
+      - name: Database install artifacts and equivalence
+        run: npm run db:baseline:check
+
+      - name: Mail scheduler SQL control flow
+        run: npm run test:mail:scheduler
+
+      - name: Payment scheduler SQL control flow
+        run: npm run test:payment:scheduler
+
+      - name: Content permission and rendering tests
+        run: npm run test:content
+
+      - name: Publication transaction and RLS tests
+        run: npm run test:publish
+
+      - name: Admin authentication guards
+        run: npm run test:admin
+
+      - name: Avatar retrieval and gating tests
+        run: npm run test:avatar
+      - name: AI connections, knowledge jobs and protocol boundaries
+        run: npm run test:ai
+      - name: Skill packages, authorization and restricted text runner
+        run: npm run test:skills
+      - name: Scoped handbook sync and Obsidian bundle
+        run: |
+          npm run test:handbooks
+          npm run plugin:check
+
+      - name: Offline embedding compatibility probe tests
+        run: npm run test:embedding
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: test-key
+
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium for isolated UI checks
+        timeout-minutes: 5
+        run: |
+          # The hosted runner's preferred Azure mirror can stall before Ubuntu fallback.
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+          fi
+          printf 'Acquire::Retries "1";\nAcquire::http::Timeout "20";\nAcquire::https::Timeout "20";\n' | sudo tee /etc/apt/apt.conf.d/99-ci-network >/dev/null
+          npx playwright install --with-deps chromium
+      - name: Themes, responsive navigation and editing recovery
+        timeout-minutes: 9
+        run: npm run test:browser

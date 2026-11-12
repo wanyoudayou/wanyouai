@@ -1,0 +1,64 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { installTestDatabase } from "./support/database";
+import {PGlite} from '@electric-sql/pglite';
+import {vector} from '@electric-sql/pglite-pgvector';
+import {projectPath,relativeAsset,normalizeEmbeds,localReferences,insertImageText} from '../src/lib/importing/paths';
+import {publish,type PublisherStore} from '../src/lib/publishing/pipeline';
+import type {PublishInput,PublishResponse} from '../src/lib/publishing/types';
+
+test('folder paths, relative assets, embeds and external insertion fail closed',()=>{
+  assert.equal(relativeAsset('docs/01.md','../images/图.png'),'images/图.png');
+  for(const path of ['../a','/a','a/../b','a\\b','a//b','a\u0000b'])assert.throws(()=>projectPath(path));
+  assert.throws(()=>relativeAsset('a.md','../private.png'));
+  assert.throws(()=>relativeAsset('a.md','https://private.test/a'));
+  assert.equal(normalizeEmbeds('![[images/a.png|300]]'),'![a.png|300](<images/a.png>)');
+  assert.equal(normalizeEmbeds('`![[x.pdf]]`'),'`![[x.pdf]]`');
+  assert.throws(()=>normalizeEmbeds('![[x.pdf]]'));
+  assert.deepEqual(localReferences('![x](<images/a.png>)\n![e](https://test.invalid/a.png)'),['images/a.png']);
+  assert.throws(()=>insertImageText('javascript:alert(1)','x'));
+  assert.throws(()=>insertImageText('https://user:pass@host/a.png','x'));
+  assert.equal(insertImageText('https://host/a.png','x'),'![x](<https://host/a.png>)');
+});
+test('pending revisions isolate content, serialize versions, publish idempotently and reject stale review',async t=>{
+  const db=new PGlite({extensions:{vector}});t.after(()=>db.close());
+  await installTestDatabase(db);
+  await db.exec('reset role;set role service_role');
+  const snapshot={frontmatter:{title:'文件导入',slug:'import-first',type:'chapter',access:'paid',series_slug:'demo-selection-handbook'},markdown:'PREVIEW\n\n<!-- paywall -->\n\nIMPORT_PRIVATE',media:[]} as Omit<PublishInput,'client_request_id'>;
+  async function stage(hash:string,expected:number,request:string,body=snapshot) {
+    return (await db.query<{id:number}>(`select stage_content_file('series:demo-selection-handbook','docs/01.md','import-first',$1,$2::jsonb,$3,$4) as id`,[hash.repeat(64),JSON.stringify(body),expected,request])).rows[0].id;
+  }
+  const id=await stage('a',0,'import-1');
+  assert.equal(await stage('a',0,'retry'),id);
+  assert.equal((await db.query('select * from articles where slug=\'import-first\'')).rows.length,0);
+  await db.exec('reset role;reset request.jwt.claims;set role anon');
+  await assert.rejects(db.query('select * from content_file_revisions'),/permission denied/);
+  await assert.rejects(db.query("select stage_content_file('blog','a.md','aa','x','{}',0,'bad')"),/permission denied/);
+  await db.exec('reset role;set role authenticated');
+  await db.query("select set_config('request.jwt.claims',$1,false)",[JSON.stringify({sub:'00000000-0000-4000-8000-000000000002'})]);
+  assert.equal((await db.query('select * from content_file_revisions')).rows.length,0);
+  assert.equal((await db.query('select * from content_file_heads')).rows.length,0);
+  await db.query("select set_config('request.jwt.claims',$1,false)",[JSON.stringify({sub:'00000000-0000-4000-8000-000000000001'})]);
+  assert.equal((await db.query('select * from content_file_heads')).rows.length,1);
+  await assert.rejects(db.query("update content_file_revisions set snapshot='{}'"),/permission denied/);
+  await db.exec('reset role;set role service_role');
+  const store:PublisherStore={replay:async()=>null,commit:async(_r,p)=>(await db.query<{r:PublishResponse}>('select commit_file_publication($1,$2::jsonb) as r',[id,JSON.stringify(p)])).rows[0].r,media:{download:async()=>null,upload:async()=>{},publicUrl:p=>'https://test.invalid/'+p},revalidate:()=>{}};
+  const published=await publish({client_request_id:'import-1',...snapshot},store);
+  assert.equal(published.article?.version,1);
+  assert.deepEqual(await publish({client_request_id:'import-1',...snapshot},store),published);
+  assert.equal(await stage('a',id,'no-change'),id);
+  const revision2=await stage('b',id,'import-2',{...snapshot,markdown:'NEW PREVIEW\n\n<!-- paywall -->\n\nSECOND_PRIVATE'});
+  assert.equal((await db.query<{content:string}>("select content from article_bodies where article_id=(select id from articles where slug='import-first')")).rows[0].content,snapshot.markdown);
+  await assert.rejects(stage('c',id,'stale-save'),/IMPORT_STALE/);
+  const fileId=(await db.query<{file_id:number}>('select file_id from content_file_revisions where id=$1',[id])).rows[0].file_id;
+  await db.query("select order_content_files('series:demo-selection-handbook',$1::bigint[])",[[fileId]]);
+  await assert.rejects(db.query("select order_content_files('series:demo-selection-handbook',array[999]::bigint[])"),/ORDER_STALE/);
+  await db.exec("update articles set title='Concurrent edit' where slug='import-first'");
+  const stale=await db.query<{r:PublishResponse}>('select commit_file_publication($1,$2::jsonb) as r',[revision2,'{}']);
+  assert.equal(stale.rows[0].r.status,'blocked');
+  const rebased=await stage('b',revision2,'import-rebased');
+  assert.notEqual(rebased,revision2);
+  await db.exec('reset role;reset request.jwt.claims;set role anon');
+  assert.equal((await db.query("select * from article_bodies where article_id=(select id from articles where slug='import-first')")).rows.length,0);
+  assert.equal((await db.query("select * from article_chunks where content like '%IMPORT_PRIVATE%' or content like '%SECOND_PRIVATE%' ")).rows.length,0);
+});

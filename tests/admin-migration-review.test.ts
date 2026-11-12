@@ -1,0 +1,34 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { PGlite } from "@electric-sql/pglite";
+import { vector } from "@electric-sql/pglite-pgvector";
+import { installTestDatabase } from "./support/database";
+
+for (const startingVersion of ["20261018061135", "20261020090813", "20261020112058"]) test(`migration review from ${startingVersion}: rollback and commit preserve data; altered old data aborts`, async t => {
+  const directory = await mkdtemp(join(tmpdir(), "wanyou-migration-review-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const prefix = join(directory, "upgrade");
+  const generated = spawnSync(process.execPath, ["scripts/build-migration-review.mjs", prefix, "--from", startingVersion], { encoding: "utf8" });
+  assert.equal(generated.status, 0, generated.stderr);
+  const rollback = await readFile(prefix + "-rollback.sql", "utf8");
+  const commit = await readFile(prefix + "-commit.sql", "utf8");
+  const db = new PGlite({ extensions: { vector } }); t.after(() => db.close());
+  await installTestDatabase(db, { throughVersion: startingVersion });
+  const before = (await db.query("select row_to_json(s) from public.site_config s")).rows;
+  await db.exec(rollback);
+  assert.deepEqual((await db.query("select row_to_json(s) from public.site_config s")).rows, before);
+  const corrupted = commit.replace("do $preservation$", "update public.site_config set site_name='unexpected';\ndo $preservation$");
+  await assert.rejects(db.exec(corrupted), /Migration changed data in site_config/);
+  await db.exec("rollback");
+  await db.exec(commit);
+  const manifest = JSON.parse(await readFile(new URL("../supabase/release-manifest.json", import.meta.url), "utf8"));
+  assert.equal((await db.query<{ version: string }>("select version from public.app_schema_version where id=1")).rows[0].version, manifest.schema_version);
+  const original = (before[0] as { row_to_json: Record<string, unknown> }).row_to_json;
+  const after = (await db.query<{ value: Record<string, unknown> }>("select to_jsonb(s) value from public.site_config s")).rows[0].value;
+  for (const key of Object.keys(after)) if (!(key in original)) delete after[key];
+  assert.deepEqual(after, original);
+});
