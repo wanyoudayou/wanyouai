@@ -13,12 +13,19 @@ const allowed = new Set([
   "content/starter/overview.md",
   "content/starter/publishing.md",
   "content/starter/navigation.md",
+  "content/starter/avatar.md",
+  "content/starter/skills-online.md",
+  "content/starter/custom-pages.md",
+  "content/starter/code-sections.md",
+  "content/starter/obsidian.md",
   "docs/deployment/guide.md",
 ]);
 if (
   manifest.version !== 1 ||
-  manifest.articles.length !== 8 ||
-  new Set(manifest.articles.map((a) => a.slug)).size !== 8
+  // The database import accepts 1–40 chapters (prepare_starter_content).
+  manifest.articles.length < 1 ||
+  manifest.articles.length > 40 ||
+  new Set(manifest.articles.map((a) => a.slug)).size !== manifest.articles.length
 )
   throw new Error("Invalid starter manifest");
 const parse = markdown => unified().use(remarkParse).use(remarkGfm).parse(markdown);

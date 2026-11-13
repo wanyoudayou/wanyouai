@@ -15,6 +15,7 @@ import {
   EMPTY_FRONTMATTER,
   exportMarkdown,
   importMarkdown,
+  keepClassification,
   mergeDraftMedia,
   newPublication,
   replaceDraftImage,
@@ -118,6 +119,8 @@ export function ContentWorkbench({
         imported.frontmatter = { ...imported.frontmatter, type: "skill", access: "public" };
         delete imported.frontmatter.price; delete imported.frontmatter.series_slug;
       }
+      // A file without its own type keeps the editor's type and album (e.g. 「新建章节」).
+      imported.frontmatter = keepClassification(imported.frontmatter, frontmatter, imported.explicitFields);
       setFrontmatter(imported.frontmatter);
       setMarkdown(imported.markdown);
       setMedia([]);

@@ -1008,7 +1008,7 @@ CREATE OR REPLACE FUNCTION public.stage_content_file(p_scope text, p_path text, 
  LANGUAGE plpgsql
  SET search_path TO ''
 AS $function$
-declare f public.content_files%rowtype; r public.content_file_revisions%rowtype; result bigint; base timestamptz;
+declare f public.content_files%rowtype; r public.content_file_revisions%rowtype; result bigint; base timestamptz; next_sort integer;
 begin
   perform pg_catalog.pg_advisory_xact_lock(71003, pg_catalog.hashtext(p_scope || '/' || p_path));
   select * into f from public.content_files where scope=p_scope and path=p_path for update;
@@ -1018,7 +1018,15 @@ begin
   if coalesce(r.id,0) <> p_expected then raise exception 'IMPORT_STALE'; end if;
   if f.id is not null and f.article_slug <> p_slug then raise exception 'IMPORT_SLUG_CHANGED'; end if;
   if f.id is null then
-    insert into public.content_files(scope,path,article_slug,sort) values(p_scope,p_path,p_slug,(select coalesce(max(sort),0)+1 from public.content_files where scope=p_scope)) returning * into f;
+    perform pg_catalog.pg_advisory_xact_lock(71004, pg_catalog.hashtext(p_scope));
+    select a.sort_order into next_sort from public.articles a where a.slug=p_slug and p_scope like 'series:%';
+    if next_sort is null then
+      select greatest(
+        coalesce((select max(sort) from public.content_files where scope=p_scope),0),
+        coalesce((select max(a.sort_order) from public.articles a join public.series s on s.id=a.series_id where 'series:'||s.slug=p_scope),0)
+      )+1 into next_sort;
+    end if;
+    insert into public.content_files(scope,path,article_slug,sort) values(p_scope,p_path,p_slug,next_sort) returning * into f;
   end if;
   select updated_at into base from public.articles where slug=p_slug;
   insert into public.content_file_revisions(file_id,version,input_hash,snapshot,base_updated_at,request_id)
@@ -1053,30 +1061,6 @@ begin
     update public.content_file_revisions set publication=result, published_updated_at=(select updated_at from public.articles where slug=f.article_slug) where id=r.id;
   end if;
   return result;
-end $function$;
-
-CREATE OR REPLACE FUNCTION public.order_content_files(p_scope text, p_ids bigint[])
- RETURNS void
- LANGUAGE plpgsql
- SET search_path TO ''
-AS $function$
-declare item record; previous_updated timestamptz; next_updated timestamptz;
-begin
-  perform pg_catalog.pg_advisory_xact_lock(71004,pg_catalog.hashtext(p_scope));
-  if cardinality(p_ids) <> (select count(*) from public.content_files where scope=p_scope)
-    or cardinality(p_ids) <> (select count(distinct x) from unnest(p_ids) x)
-    or exists(select 1 from unnest(p_ids) x where not exists(select 1 from public.content_files where id=x and scope=p_scope)) then
-    raise exception 'ORDER_STALE';
-  end if;
-  for item in select id,position from unnest(p_ids) with ordinality as t(id,position) loop
-    update public.content_files set sort=item.position where id=item.id;
-    -- Reordering does not alter text, access or publication status.
-    select updated_at into previous_updated from public.articles where slug=(select article_slug from public.content_files where id=item.id);
-    update public.articles set sort_order=item.position where slug=(select article_slug from public.content_files where id=item.id) and sort_order<>item.position;
-    select updated_at into next_updated from public.articles where slug=(select article_slug from public.content_files where id=item.id);
-    update public.content_file_revisions set base_updated_at=next_updated where file_id=item.id and publication is null and base_updated_at=previous_updated;
-    update public.content_file_revisions set published_updated_at=next_updated where file_id=item.id and publication is not null and published_updated_at=previous_updated;
-  end loop;
 end $function$;
 
 CREATE OR REPLACE FUNCTION public.settle_payment(p_order_id bigint, p_event_id text, p_amount numeric, p_payload jsonb)
@@ -2092,8 +2076,8 @@ begin
    return to_jsonb(job)-'objects';
  end if;
  if p_hash is null or p_hash !~ '^[a-f0-9]{64}$' or p_html is null or length(p_html)>100000
-   or coalesce(jsonb_typeof(p_articles),'')<>'array' or jsonb_array_length(p_articles)<>8 then raise exception 'INVALID_STARTER_TEMPLATE'; end if;
- if exists(select 1 from public.publish_requests where client_request_id ~ '^starter_v1_[0-7]$')
+   or coalesce(jsonb_typeof(p_articles),'')<>'array' or jsonb_array_length(p_articles) not between 1 and 40 then raise exception 'INVALID_STARTER_TEMPLATE'; end if;
+ if exists(select 1 from public.publish_requests where client_request_id ~ '^starter_v1_[0-9]+$')
    or exists(select 1 from public.series where slug='getting-started') or exists(select 1 from public.custom_pages where slug='pricing')
    or exists(select 1 from public.articles where slug in(select value->>'slug' from jsonb_array_elements(p_articles)))
    or exists(select 1 from public.content_files where article_slug in(select value->>'slug' from jsonb_array_elements(p_articles))) then raise exception 'STARTER_SLUG_CONFLICT'; end if;
@@ -2120,14 +2104,15 @@ CREATE OR REPLACE FUNCTION public.commit_starter_publication(p_request_id text, 
  SET search_path TO ''
 AS $function$
 declare job public.starter_imports%rowtype; descriptor jsonb; item public.articles%rowtype;
- parent public.series%rowtype; page public.custom_pages%rowtype; result jsonb; step integer;
+ parent public.series%rowtype; page public.custom_pages%rowtype; result jsonb; step integer; last_step integer;
 begin
  select * into job from public.starter_imports where id='getting-started-v1' for update;
  if not found then raise exception 'STARTER_NOT_PREPARED'; end if;
  select response into result from public.publish_requests where client_request_id=p_request_id;
  if found then return result; end if;
  step:=job.published_count;
- if job.completed or step>=8 or p_request_id<>'starter_v1_'||step::text then raise exception 'STARTER_STEP_CHANGED'; end if;
+ last_step:=jsonb_array_length(job.objects->'articles')-1;
+ if job.completed or step>last_step or p_request_id<>'starter_v1_'||step::text then raise exception 'STARTER_STEP_CHANGED'; end if;
  descriptor:=job.objects->'articles'->step;
  select * into item from public.articles where id=(descriptor->>'id')::bigint for update;
  if not found or item.updated_at is distinct from (descriptor->>'updated_at')::timestamptz
@@ -2135,7 +2120,7 @@ begin
    or p_payload->'frontmatter'->>'slug'<>item.slug or p_payload->'frontmatter'->>'access'<>'public'
    or p_payload->'frontmatter'->>'type'<>'chapter' or p_payload->'frontmatter'->>'series_slug'<>'getting-started'
    or p_payload->>'content_hash' is distinct from descriptor->>'content_hash' then raise exception 'STARTER_CONTENT_CHANGED'; end if;
- if step=7 then
+ if step=last_step then
    select * into parent from public.series where id=(job.objects->>'series_id')::bigint for update;
    select * into page from public.custom_pages where id=(job.objects->>'page_id')::bigint for update;
    if parent.updated_at is distinct from (job.objects->>'series_updated_at')::timestamptz or parent.status<>'draft'
@@ -2145,10 +2130,10 @@ begin
  if result->>'status'='blocked' or jsonb_typeof(result->'article') is distinct from 'object' then return result; end if;
  select * into item from public.articles where id=item.id;
  job.objects:=jsonb_set(job.objects,array['articles',step::text,'updated_at'],to_jsonb(item.updated_at));
- if step=7 then
+ if step=last_step then
    if (select count(*) from public.articles a where a.id in(select (value->>'id')::bigint from jsonb_array_elements(job.objects->'articles'))
      and a.series_id=parent.id and a.type='chapter' and a.status='published' and a.access='public'
-     and a.updated_at=(select (value->>'updated_at')::timestamptz from jsonb_array_elements(job.objects->'articles') where (value->>'id')::bigint=a.id))<>8 then raise exception 'STARTER_CONTENT_CHANGED'; end if;
+     and a.updated_at=(select (value->>'updated_at')::timestamptz from jsonb_array_elements(job.objects->'articles') where (value->>'id')::bigint=a.id))<>last_step+1 then raise exception 'STARTER_CONTENT_CHANGED'; end if;
    update public.series set readme_article_id=(job.objects->'articles'->0->>'id')::bigint,status='published' where id=parent.id;
    update public.custom_pages set status='published' where id=page.id;
    insert into public.nav_items(kind,label,icon,page_id,sort_order) values('page','收费方案','credit-card',page.id,90)
@@ -2156,7 +2141,7 @@ begin
    insert into public.nav_items(kind,label,icon,series_id,sort_order) values('series','使用指南','book-open',parent.id,100)
      on conflict (series_id) where series_id is not null do nothing;
  end if;
- update public.starter_imports set published_count=step+1,completed=(step=7),objects=job.objects,updated_at=now() where id=job.id;
+ update public.starter_imports set published_count=step+1,completed=(step=last_step),objects=job.objects,updated_at=now() where id=job.id;
  return result;
 end $function$;
 
@@ -3750,6 +3735,74 @@ AS $function$
   limit 100
 $function$;
 
+CREATE OR REPLACE FUNCTION public.order_series_chapters(p_series bigint, p_ids bigint[])
+ RETURNS void
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+declare album public.series%rowtype; item record; previous_updated timestamptz; next_updated timestamptz; total integer;
+begin
+  select * into album from public.series where id=p_series for update;
+  if album.id is null or album.status='archived' then raise exception 'ORDER_STALE'; end if;
+  perform pg_catalog.pg_advisory_xact_lock(71004, pg_catalog.hashtext('series:'||album.slug));
+  total := coalesce(cardinality(p_ids),0);
+  if total=0 or total>1000
+    or total <> (select count(*) from public.articles where series_id=album.id)
+    or total <> (select count(distinct x) from unnest(p_ids) x)
+    or exists(select 1 from unnest(p_ids) x where not exists(select 1 from public.articles where id=x and series_id=album.id)) then
+    raise exception 'ORDER_STALE';
+  end if;
+  for item in select a.id,a.slug,t.position::integer as position from unnest(p_ids) with ordinality as t(id,position) join public.articles a on a.id=t.id order by t.position loop
+    select updated_at into previous_updated from public.articles where id=item.id for update;
+    update public.articles set sort_order=item.position where id=item.id and sort_order<>item.position;
+    select updated_at into next_updated from public.articles where id=item.id;
+    update public.content_files set sort=item.position where scope='series:'||album.slug and article_slug=item.slug;
+    update public.content_file_revisions r set base_updated_at=next_updated from public.content_files f
+      where f.id=r.file_id and f.scope='series:'||album.slug and f.article_slug=item.slug and r.publication is null and r.base_updated_at=previous_updated;
+    update public.content_file_revisions r set published_updated_at=next_updated from public.content_files f
+      where f.id=r.file_id and f.scope='series:'||album.slug and f.article_slug=item.slug and r.publication is not null and r.published_updated_at=previous_updated;
+  end loop;
+  -- Files saved but never published follow after the published chapters, in their current order.
+  update public.content_files f set sort=total+ranked.n from (
+    select c.id,row_number() over (order by c.sort,c.id) n from public.content_files c
+    where c.scope='series:'||album.slug and not exists(select 1 from public.articles a where a.slug=c.article_slug)
+  ) ranked where f.id=ranked.id;
+end $function$;
+
+CREATE OR REPLACE FUNCTION public.delete_free_article(p_id bigint, p_expected_updated_at timestamp with time zone)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+declare item public.articles%rowtype; album public.series%rowtype; parent_id bigint;
+begin
+  select series_id into parent_id from public.articles where id=p_id;
+  if parent_id is not null then select * into album from public.series where id=parent_id for update; end if;
+  select * into item from public.articles where id=p_id for update;
+  if item.id is null then return jsonb_build_object('ok',false,'message','内容不存在'); end if;
+  perform pg_catalog.pg_advisory_xact_lock(71002, pg_catalog.hashtext(item.slug));
+  if p_expected_updated_at is null or item.updated_at<>p_expected_updated_at then
+    return jsonb_build_object('ok',false,'message','内容已更新，请刷新后重试');
+  end if;
+  if item.type not in ('blog','chapter') then
+    return jsonb_build_object('ok',false,'message','Skill 请在 Skill 管理中暂停或归档');
+  end if;
+  if item.access not in ('public','registered') then
+    return jsonb_build_object('ok',false,'message','付费或订阅内容不能删除，请使用暂停与归档');
+  end if;
+  if album.id is not null and album.readme_article_id=item.id then
+    return jsonb_build_object('ok',false,'message','此章节是专辑 README，请先更换 README');
+  end if;
+  if exists(select 1 from public.orders o where (o.sku_type='single' and o.target_id=item.id) or (album.id is not null and o.sku_type='series' and o.target_id=album.id))
+    or exists(select 1 from public.entitlements e where (e.type='single' and e.target_id=item.id) or (album.id is not null and e.type='series' and e.target_id=album.id)) then
+    return jsonb_build_object('ok',false,'message','已有订单或购买权益，不能删除，请使用暂停与归档');
+  end if;
+  delete from public.content_files where article_slug=item.slug;
+  delete from public.articles where id=item.id;
+  return jsonb_build_object('ok',true,'message','已删除','slug',item.slug,'type',item.type,
+    'series_slug',album.slug,'series_type',album.type);
+end $function$;
+
 create view public."admin_collections" with (security_invoker=true) as SELECT id,
     slug,
     type,
@@ -4759,7 +4812,7 @@ alter table public."starter_imports" add constraint "starter_imports_id_check" C
 
 alter table public."starter_imports" add constraint "starter_imports_objects_check" CHECK (jsonb_typeof(objects) = 'object'::text);
 
-alter table public."starter_imports" add constraint "starter_imports_published_count_check" CHECK (published_count >= 0 AND published_count <= 8);
+alter table public."starter_imports" add constraint "starter_imports_published_count_check" CHECK (published_count >= 0 AND published_count <= 40);
 
 alter table public."starter_imports" add constraint "starter_imports_template_hash_check" CHECK (template_hash ~ '^[a-f0-9]{64}$'::text);
 
@@ -5293,8 +5346,6 @@ revoke all on function public.stage_content_file(text, text, text, text, jsonb, 
 
 revoke all on function public.commit_file_publication(bigint, jsonb) from public, anon, authenticated, service_role;
 
-revoke all on function public.order_content_files(text, bigint[]) from public, anon, authenticated, service_role;
-
 revoke all on function public.settle_payment(bigint, text, numeric, jsonb) from public, anon, authenticated, service_role;
 
 revoke all on function public.match_chunks(extensions.vector, integer) from public, anon, authenticated, service_role;
@@ -5500,6 +5551,10 @@ revoke all on function public.save_nav_items(text, jsonb) from public, anon, aut
 revoke all on function public.guard_nav_item_parent() from public, anon, authenticated, service_role;
 
 revoke all on function public.public_navigation() from public, anon, authenticated, service_role;
+
+revoke all on function public.order_series_chapters(bigint, bigint[]) from public, anon, authenticated, service_role;
+
+revoke all on function public.delete_free_article(bigint, timestamp with time zone) from public, anon, authenticated, service_role;
 
 revoke all on table public."ai_calls" from public, anon, authenticated, service_role;
 
@@ -5729,6 +5784,8 @@ grant EXECUTE on function public.create_pending_order(uuid, text, bigint, numeri
 
 grant EXECUTE on function public.create_synced_handbook(uuid, uuid, text, text, text) to "service_role";
 
+grant EXECUTE on function public.delete_free_article(bigint, timestamp with time zone) to "service_role";
+
 grant EXECUTE on function public.discard_knowledge_generation(uuid, uuid) to "service_role";
 
 grant EXECUTE on function public.dispatch_ai_call(uuid) to "service_role";
@@ -5805,7 +5862,7 @@ grant EXECUTE on function public.nav_items_version() to "service_role";
 
 grant EXECUTE on function public.new_merchant_order_no() to "service_role";
 
-grant EXECUTE on function public.order_content_files(text, bigint[]) to "service_role";
+grant EXECUTE on function public.order_series_chapters(bigint, bigint[]) to "service_role";
 
 grant EXECUTE on function public.prepare_email_job(uuid, uuid, jsonb, text) to "service_role";
 

@@ -59,6 +59,8 @@ Lucide 控件图标使用 12/14/16/20px、stroke 2，小尺寸可 1.5；辅助�
 | `TurnstileChallenge` | 匿名分身发送时按需打开居中弹窗；通过即关闭并继续该次发送，取消保留原输入；加载失败可手动重试，键盘焦点回到发送入口 | 安全与人机校验 |
 | `NavigationRail` / `MobileNavigation` | 共享导航来源、平板图标栏与手机底导航、抽屉互斥 | §4 |
 | `ContentCard` | 共边 120px 封面、12px 内容间距、14px 加粗标题与 11px 元信息；四类内容卡共用原稿默认/hover/pressed状态，不修改ui原语 | §3 / §5 |
+| `SubscriptionHint` / `subscriptionHintIcon` | 订阅购买按钮的装饰图标（`aria-hidden`，图标白名单见 `lib/subscription-hint.ts`）与按钮下方 `text-xs text-muted-foreground` 月均提示行；paywall、订阅交叉卡、/card 订阅卡、cp-subscribe 与 PricingPlans 共用，未配置不渲染 | §5 / 产品契约 §4.3 |
+| `SocialIcon` | 名片自媒体平台图标：`bg-accent` 圆角块 + `text-primary` Lucide 线性图标（平台映射见 `components/card/social-icon.tsx`，不使用品牌标志或文字标记），`aria-hidden`；名片与后台平台编辑共用 | pages §3 名片 |
 | `PricingPlans` / `PricingFeatureList` | 三列方案 + 服务询价横条；label13→price30/period12→分隔→Lucide功能列表→全宽pill CTA；真实配置决定价格与动作 | §5 / 自定义页面契约 |
 | `AppShell` | grid 三列（`--w-left-nav` / 1fr / `--w-right-panel`）；xl 下右列收 `--w-right-collapsed`（由 `RightPanelCollapseContext` 驱动列宽切换）；md 下改手机底部导航，中间宽度显示图标栏 | §2 / 2.6 |
 | `LeftNav` | 顶栏 `SiteLogo` + 站名/简介 + ScrollArea 导航 + Separator + 底部固定身份区；站主登录时后台区段为单入口「网站管理」。自定义导航项使用白名单图标（`navIcon`），外链在名称后附 ArrowUpRight 标记并新窗口打开；父级目录为按钮（`aria-expanded`），右侧 ChevronDown 展开时旋转 180°，子项缩进且只有一层；代码栏目项 `max-md:hidden`，手机目录显示“更多栏目请在电脑上访问。”；激活态由最长前缀匹配统一计算，图标栏共用 | 2.1 / 2.4 |
@@ -72,9 +74,9 @@ Lucide 控件图标使用 12/14/16/20px、stroke 2，小尺寸可 1.5；辅助�
 | `AvatarChat` | 消息气泡 card/muted+ 多行 Textarea（`MentionInput` 的 @ 补全同源；Enter 发送 / Shift+Enter 换行，按内容自增高）+ 框内右下角发送按钮；面板头部常驻 AI 标注；会话只有一个家=右栏 | 2.3 |
 | `MentionInput` | 对话输入 + @ 触发自动补全（已发布内容模糊匹配）+ 选中项 chip 化；@引用 = 补发门票（钉载 + 加权，PRD §4.6） | 2.3 / 3.1 |
 | `PageOutline` | 服务端锚点列表 text-sm；OutlineLinks 对已渲染节点做滚动高亮，当前项 primary 左边框 | 2.3 |
-| `HeroCard` | 大 banner 背景图（`banner_light_url` / `banner_dark_url` 分别配置浅深背景，单侧留空时使用对应内置 Cloud Glass / Night Wave 图片（深色文件仍为 `hero-terminal-wave.svg`）；前景和控件自动跟随主题，开阔排版无内嵌圆角面板；自定义图片保持色彩，用整幅渐变保护文字）+ 一句话（`whitespace-pre-line`，站主配置内换行即断行；text-4xl / sm:5xl / lg:6xl）+ FactBadges + 专注/不做摘要 + HeroAskBox；向下滚动时整块压缩：徽章与摘要先淡出，一句话缩小后淡出，背景图以一半速度移动并保持铺满，最后固定在顶栏下方、只剩问句框的横条；问句框不可用时不固定；减少动态效果时背景与标题不做位移和缩放；订阅 pill 仅左栏，Hero 内不渲染 | 3.1 块 1 |
+| `HeroCard` | 大 banner 背景图（`banner_light_url` / `banner_dark_url` 分别配置浅深背景，单侧留空时使用对应内置 Cloud Glass / Night Wave 图片（深色文件仍为 `hero-terminal-wave.svg`）；前景和控件自动跟随主题，开阔排版无内嵌圆角面板；自定义图片保持色彩，用整幅渐变保护文字）+ 一句话（`whitespace-pre-line`，40px / 移动 30px）+ 副标题（muted，18px / 16px）+ HeroActions + FactBadges + 专注/不做摘要；`data-layout` 居中或左对齐，左对齐右侧图片圆角 `--opc-card-radius`、最大 420px，容器 ≥760px 并排、更窄隐藏；无横幅图时底部 1px 浅分隔线（border 60%）；HeroParallax 写入滚动进度，背景 0.4 倍、图片 0.25 倍速度移动且缩小至 92%，减少动态效果时静止 | 3.1 块 1 |
 | `FactBadges` | Badge outline + lucide 小图标；只放可验证事实，声誉不自陈 | 3.1 纪律 |
-| `HeroAskBox` | Input + 图标按钮（→）；placeholder 读 home_config；提交唤起 RightPanel 并带入问题 | 3.1 纪律 |
+| `HeroActions` | Button `size-lg rounded-full`：订阅为 primary（订阅提示图标 + 月均提示行），和我聊聊在有订阅时为 outline、单独时为 primary（MessageCircle 图标）；已订阅显示 outline「订阅会员 · 剩余 N 天」；不可用的按钮不渲染 | 3.1 纪律 |
 | `ListBrowser` / `TypeColumn` | 工具条与卡片网格组合；类型栏目服务端取数，客户端搜索与排序 | 3.2 / 3.4 |
 | `ContentLoadError` | 错误边界提示 + 重试 Button，取数失败与空列表区分 | 3.2 / 3.4 |
 | `ListToolbar` | Input 搜索 + Select 排序 + 权限计数 chips（Badge 可点选过滤） | 3.2 / 3.4 |
@@ -117,6 +119,7 @@ Lucide 控件图标使用 12/14/16/20px、stroke 2，小尺寸可 1.5；辅助�
 | `NavigationManager` | 后台导航编辑：列表行 = 图标 + 名称 Input + 图标 select + 类型 StatusBadge(neutral) + 目标地址 + 问题 StatusBadge(warning)，右侧访问级别（仅代码栏目）、启用、上移 / 下移 / 移除图标按钮；“添加导航”卡按类型切换字段；底部吸附保存栏（保存 / 放弃修改 / 状态） | 3.13 |
 | 栏目 SDK（`@/sections/_sdk`） | 代码栏目唯一可用的主站界面：再导出 Button / Input / Badge / Card / Dialog / Separator / Skeleton / Tabs、StatusBadge、Callout、EmptyState，提供 `SectionHeader`（与站点同级标题区）、`SectionBody`、`usePersistentState`（带栏目前缀的本机存储，同页同键组件与其他标签页在写入后同步）。栏目样式只用 token；扩展档变量限定在 `[data-section="<name>"]` 作用域并同时定义浅深值 | 3.16 |
 | `SeriesCreateForm` / `ContentControls` | 先选类型（手册 / 活动卡片单选）再按类型显示字段的草稿创建；README 选择与上架；暂停 / 恢复 / 归档确认；操作反馈与并发更新检查；文章类附「编辑内容」入口（/admin/content?article=id 装载）。复用 Input / Button 与原生 select | 3.13 |
+| `ChapterOrder` / `DeleteArticle` | 专辑页章节顺序：序号 + 标题 + 非发布状态 StatusBadge + 上移／下移图标按钮，本地调整后一次保存或放弃；文章详情删除区：说明、不可删除原因或勾选确认 + destructive 按钮，成功后返回列表 | 3.13 |
 | `AdminLoginForm` / `AdminDashboard` | 站主 magic link 表单、无权限态、独立加载的指标卡和常用入口；复用 Input / Button 与语义列表 | 3.13 |
 | `AdminDataTable` / `AdminResourcePage` | TanStack 受控服务端表格、筛选工具栏、手机摘要卡、20/50/100 分页和错误状态 | 3.13 |
 | `SkillManager` | 公开介绍编辑入口、私有包上传与状态查询、不可变版本清单、当前版本和使用方式设置；失败保留输入，不自动重新上传 | Skill 契约 |

@@ -47,7 +47,7 @@
 
 图片桶为公开读、服务端写；不授予 anon / authenticated 上传、覆盖或删除权限。服务端核验对象 SHA-256、实际格式和尺寸，SVG 经白名单消毒后转 PNG，页面仅引用转换结果。第三方图片不由携带凭据的服务端抓取，返回外链未本地化警告。
 
-Web 导入按当前 install/升级路径配置；content_files / content_file_revisions / content_assets 全部启用 RLS，仅 authenticated owner 读取，service_role 写入。heads 视图显式 security_invoker。stage_content_file / commit_file_publication / order_content_files 全部 SECURITY INVOKER、空 search_path，仅 service_role 可执行；应用入口逐次验证同源和 owner。文件夹附件先校验后写公开图片桶，待发布 Markdown 只存 owner-only 修订表。
+Web 导入按当前 install/升级路径配置；content_files / content_file_revisions / content_assets 全部启用 RLS，仅 authenticated owner 读取，service_role 写入。heads 视图显式 security_invoker。stage_content_file / commit_file_publication / order_series_chapters / delete_free_article 全部 SECURITY INVOKER、空 search_path，仅 service_role 可执行；应用入口逐次验证同源和 owner。文件夹附件先校验后写公开图片桶，待发布 Markdown 只存 owner-only 修订表。
 
 ## 函数与授权加固
 

@@ -28,17 +28,11 @@ for (const theme of ["light", "dark"] as const) {
       "color",
       theme === "light" ? "rgb(45, 42, 69)" : "rgb(230, 227, 245)",
     );
-    await expect(page.locator(".opc-hero__input")).toHaveCSS(
-      "color",
-      theme === "light" ? "rgb(45, 42, 69)" : "rgb(230, 227, 245)",
-    );
-    await page.getByLabel("向站主的分身提问").fill("切换横幅时保留的问题");
     const opposite = theme === "light" ? "dark" : "light";
     const appearance = page.getByRole("button", { name: /^外观：/ });
     await appearance.click();
     if (opposite === "dark") await appearance.click();
     await expect(page.locator(`.opc-hero__image--${opposite}`)).toBeVisible();
-    await expect(page.getByLabel("向站主的分身提问")).toHaveValue("切换横幅时保留的问题");
     if (opposite === "light") await appearance.click();
     await appearance.click();
     await page.goto("/hero-custom?dark=default");
@@ -91,36 +85,72 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
-test("hero compresses to a pinned ask box bar while scrolling, at every breakpoint", async ({ page }) => {
-  for (const width of [1440, 1024, 390]) {
+test("centred hero: subtitle, chat opens the collapsed panel and focuses the composer", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  const hero = page.getByRole("region", { name: "站点介绍" });
+  await expect(hero).toHaveAttribute("data-layout", "center");
+  await expect(hero.locator(".opc-hero__subtitle")).toHaveText("把经验整理成手册、技能与服务，读者按需阅读与合作。");
+  await expect(hero.locator(".opc-hero__text")).toHaveCSS("text-align", "center");
+  await expect(hero.getByRole("textbox")).toHaveCount(0);
+  // Payment is not enabled in this fixture, so only the chat button renders.
+  await expect(hero.getByRole("link", { name: /订阅/ })).toHaveCount(0);
+  const composer = page.getByRole("textbox", { name: "向站主的分身提问", exact: true });
+  await expect(composer).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "展开对话区" })).toBeVisible();
+  await hero.getByRole("button", { name: "和我聊聊" }).click();
+  await expect(composer).toBeFocused();
+  await page.getByRole("button", { name: "收起对话区" }).click();
+  await expect(composer).toHaveCount(0);
+});
+
+for (const width of [1440, 1100, 390, 320]) {
+  test(`left hero with side image at ${width}: actions, hint and parallax`, async ({ page }, info) => {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto("/");
+    await page.goto("/hero-layout");
     const hero = page.getByRole("region", { name: "站点介绍" });
-    const title = hero.getByRole("heading", { level: 1 });
-    const ask = hero.getByLabel("向站主的分身提问");
-    await expect(hero).toHaveAttribute("data-collapse", "");
-    await page.evaluate(() => {
-      const spacer = document.createElement("div");
-      spacer.style.height = "3000px";
-      document.querySelector("main")!.append(spacer);
-    });
-    const header = page.locator("[data-shell-header]");
-    const headerBottom = (await header.isVisible()) ? (await header.boundingBox())!.y + (await header.boundingBox())!.height : 0;
+    await expect(hero).toHaveAttribute("data-layout", "left");
+    await expect(hero.locator(".opc-hero__text")).toHaveCSS("text-align", "left");
+    const subscribe = hero.getByRole("link", { name: "订阅 · ¥99 / 年" });
+    await expect(subscribe).toHaveAttribute("href", "/p/pricing");
+    await expect(subscribe.locator("svg")).toHaveCount(1);
+    await expect(hero.getByRole("button", { name: "和我聊聊" })).toBeVisible();
+    await expect(hero.getByText("约 ¥8.25 / 月 · 一杯美式的价格")).toBeVisible();
+    const picture = hero.getByRole("img", { name: "站点工作台示意图" });
+    if (width >= 1100) {
+      await expect(picture).toBeVisible();
+      const text = (await hero.locator(".opc-hero__text").boundingBox())!;
+      const image = (await picture.boundingBox())!;
+      expect(image.x).toBeGreaterThan(text.x + text.width - 1);
+    } else await expect(picture).toBeHidden();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: info.outputPath(`hero-left-${width}.png`) });
+    if (width >= 1100) {
+      await page.mouse.wheel(0, 300);
+      await expect.poll(() => picture.evaluate((el) => getComputedStyle(el).scale)).not.toBe("1");
+    }
+  });
+}
 
-    await page.evaluate(() => window.scrollTo(0, 1500));
-    await expect(hero).toHaveAttribute("data-collapsed", "");
-    await expect(title).toHaveCSS("opacity", "0");
-    await expect(ask).toBeInViewport();
-    const heroBox = (await hero.boundingBox())!;
-    const askBox = (await ask.boundingBox())!;
-    const visible = heroBox.y + heroBox.height - headerBottom;
-    expect(Math.abs(visible - (askBox.height + 24)), `${width}px bar height`).toBeLessThanOrEqual(2);
-    expect(askBox.y, `${width}px ask box sits inside the bar`).toBeGreaterThanOrEqual(headerBottom);
-    await ask.fill("压缩后仍可提问");
-    await expect(ask).toHaveValue("压缩后仍可提问");
+test("reduced motion keeps the side image still", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/hero-layout");
+  const picture = page.getByRole("img", { name: "站点工作台示意图" });
+  await page.mouse.wheel(0, 300);
+  await expect.poll(() => page.locator(".opc-hero").evaluate((el) => getComputedStyle(el).getPropertyValue("--opc-hero-p"))).not.toBe("0");
+  expect(await picture.evaluate((el) => getComputedStyle(el).scale)).toBe("none");
+});
 
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await expect(hero).not.toHaveAttribute("data-collapsed", "");
-    await expect(title).toHaveCSS("opacity", "1");
-  }
+test("without the banner image the hero keeps its content and a faint bottom rule", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/hero-layout");
+  const hero = page.getByRole("region", { name: "站点介绍" });
+  await expect(hero.locator(".opc-hero__art")).toHaveCount(1);
+  await expect(hero).toHaveCSS("border-bottom-width", "0px");
+  await page.goto("/hero-layout?banner=off");
+  await expect(hero.locator(".opc-hero__art")).toHaveCount(0);
+  await expect(hero.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(hero.getByRole("button", { name: "和我聊聊" })).toBeVisible();
+  await expect(hero).toHaveCSS("border-bottom-width", "1px");
 });

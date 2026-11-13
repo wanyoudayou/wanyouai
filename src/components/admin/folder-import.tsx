@@ -217,19 +217,6 @@ export function FolderImport({
       setBusy(false);
     }
   }
-  async function move(index: number, offset: number) {
-    setBusy(true);
-    try {
-      const ids = inventory.files.map((f) => f.id);
-      [ids[index], ids[index + offset]] = [ids[index + offset], ids[index]];
-      await filesRequest({ op: "order", scope, ids });
-      await refresh();
-    } catch (e) {
-      setMessage((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
   const album = series.find((s) => "series:" + s.slug === scope);
   const diffRow = selected?.kind === "diff" ? rows[selected.index] : undefined;
   return (
@@ -346,12 +333,13 @@ export function FolderImport({
         <p className="text-xs text-muted-foreground">
           文档 {inventory.files.length} · 附件 {inventory.assets.length}
           。导入历史按修订保留，只有确认发布才更新线上文章。
+          {album && <>章节顺序在<Link href={`/admin/collections/${album.id}`} className="text-primary underline">专辑页</Link>调整。</>}
         </p>
         {!inventory.files.length && (
           <p className="text-sm text-muted-foreground">还没有保存的文件。</p>
         )}
         <ul className="space-y-3">
-          {inventory.files.map((f, index) => {
+          {inventory.files.map((f) => {
             const active =
               selected?.kind === "review" && selected.id === f.latest?.id;
             return (
@@ -369,22 +357,6 @@ export function FolderImport({
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={busy || index === 0}
-                    onClick={() => move(index, -1)}
-                  >
-                    上移
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={busy || index === inventory.files.length - 1}
-                    onClick={() => move(index, 1)}
-                  >
-                    下移
-                  </Button>
                   {f.latest && (
                     <Button
                       size="sm"

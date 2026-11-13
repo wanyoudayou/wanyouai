@@ -9,7 +9,7 @@
 - [Resend 邮箱验证码登录](deployment/email-login.md)：发件域、SMTP 参数、OTP 邮件模板与首次／再次登录验证。
 - [环境变量契约](contracts/environment.md)、[Supabase 安全配置](contracts/supabase-security.md)、[数据库安装与升级](../supabase/README.md)：配置与 SQL 的当前规则。
 
-站主认领后，可在「部署检查」载入可编辑的使用指南与收费方案。指南按八篇章节组织功能、安装、发布、配置与维护；部署步骤来自本目录的同一份维护文档。详细来源见[默认内容说明](../content/starter/README.md)。
+站主认领后，可在「部署检查」载入可编辑的使用指南与收费方案。指南按十三篇章节组织功能、AI 与写作特色、安装、发布、配置与维护；部署步骤来自本目录的同一份维护文档。详细来源见[默认内容说明](../content/starter/README.md)。
 
 ## 运维
 

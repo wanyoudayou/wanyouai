@@ -77,3 +77,17 @@ export function mergeDraftMedia(media: Media[], next: Media) {
 export function newPublication(frontmatter: Frontmatter, markdown: string, media: Media[]): PublishInput {
   return { client_request_id: crypto.randomUUID(), frontmatter: structuredClone(frontmatter), markdown, media: structuredClone(media) };
 }
+
+/**
+ * A Markdown file imported into the editor keeps the editor's type and album
+ * unless the file sets its own `type`; a chapter keeps its album unless the
+ * file names `series_slug`.
+ */
+export function keepClassification(imported: Frontmatter, current: Frontmatter, explicitFields: string[]): Frontmatter {
+  if (explicitFields.includes("type")) return imported;
+  const next: Frontmatter = { ...imported, type: current.type };
+  if (current.type === "chapter") {
+    if (!explicitFields.includes("series_slug")) next.series_slug = current.series_slug;
+  } else delete next.series_slug;
+  return next;
+}

@@ -1,5 +1,7 @@
 import { PurchaseButton } from "@/components/reading/purchase-button";
 import { formatPrice } from "@/lib/format";
+import { SubscriptionHint, subscriptionHintIcon } from "@/components/reading/subscription-hint";
+import type { CommerceConfig } from "@/types/site";
 
 /**
  * 订阅方案卡片：/card 左列（pill 落点 #pricing）与自定义页 cp-subscribe 占位符共用。
@@ -10,11 +12,14 @@ export function SubscriptionCard({
   amount,
   currency,
   paymentEnabled,
+  hint = null,
 }: {
   id?: string;
   amount: number;
   currency: string;
   paymentEnabled: boolean;
+  /** 订阅按钮图标与月均提示；省略时不显示。 */
+  hint?: Pick<CommerceConfig, "subscriptionPrice" | "subscriptionHint"> | null;
 }) {
   return (
     <section id={id} aria-label="订阅方案" className="scroll-mt-6 rounded-2xl border bg-card p-5 shadow-xs">
@@ -29,8 +34,9 @@ export function SubscriptionCard({
         <li>有效期内新发布内容同步解锁</li>
       </ul>
       <div className="mt-4">
-        <PurchaseButton skuType="subscription" label={`订阅 ${formatPrice(amount, currency)} / 年`} enabled={paymentEnabled} />
+        <PurchaseButton skuType="subscription" icon={hint ? subscriptionHintIcon(hint) : null} label={`订阅 ${formatPrice(amount, currency)} / 年`} enabled={paymentEnabled} />
       </div>
+      {hint ? <SubscriptionHint commerce={hint} className="mt-2" /> : null}
       <p className="mt-2 text-xs text-muted-foreground">需登录后购买；已订阅请前往会员中心查看权益。</p>
     </section>
   );

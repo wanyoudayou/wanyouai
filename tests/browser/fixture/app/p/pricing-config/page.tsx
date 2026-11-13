@@ -15,6 +15,7 @@ export default async function Page({
           subscriptionPrice: configured
             ? { amount: 299.5, currency: "CNY" }
             : null,
+          subscriptionHint: null,
         }}
       />
     </section>

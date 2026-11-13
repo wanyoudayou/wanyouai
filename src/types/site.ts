@@ -1,4 +1,5 @@
 import { isRetiredTemplateImage } from "../lib/retired-template-images";
+import { isSubscriptionHintIcon, SUBSCRIPTION_HINT_TEXT_MAX, type SubscriptionHintIcon } from "../lib/subscription-hint";
 
 /**
  * Parsed site_config JSON shapes, guarded by normalize functions.
@@ -24,26 +25,48 @@ export interface FactBadgeConfig {
   label: string | null;
 }
 
+export type HeroLayout = "center" | "left";
+export interface HeroAction {
+  enabled: boolean;
+  /** 按钮文字；null = 默认文案 */
+  label: string | null;
+}
+/** 名片 Hero 的副标题、布局、右侧图片与行动按钮（至少一个按钮勾选）。 */
+export interface HeroConfig {
+  subtitle: string | null;
+  layout: HeroLayout;
+  /** 仅左对齐布局显示的右侧图片 */
+  imageUrl: string | null;
+  imageAlt: string | null;
+  actions: { subscribe: HeroAction; chat: HeroAction };
+}
+export const HERO_SUBTITLE_MAX = 160;
+export const ONE_LINER_MAX = 180;
+export const HERO_CHAT_LABEL = "和我聊聊";
+export const HERO_ACTION_LABEL_MAX = 16;
+export const HERO_IMAGE_ALT_MAX = 120;
+
 export interface HomeConfig {
-  askPlaceholder: string;
+  hero: HeroConfig;
   /** 各主题独立的横幅；null = 使用对应主题的内置背景。 */
   bannerLightUrl: string | null;
   bannerDarkUrl: string | null;
-  /** 名片 Hero 是否显示（固定首屏，不参与五块排序） */
-  heroEnabled: boolean;
+  /** 首页 Hero 是否显示横幅背景图（Hero 本身始终显示） */
+  bannerEnabled: boolean;
   /** 首页自定义区（Hero 与五块之间）；html 保存时已净化 */
   customZone: { enabled: boolean; html: string };
   factBadges: FactBadgeConfig[];
   blocks: HomeBlockConfig[];
 }
 
+/** 自媒体平台；图标见 components/card/social-icon.tsx。 */
 export const SOCIAL_PLATFORMS = {
-  x: { label: "X（Twitter）", mark: "𝕏" },
-  github: { label: "GitHub", mark: "GH" },
-  xiaohongshu: { label: "小红书", mark: "书" },
-  xiaoyuzhou: { label: "小宇宙", mark: "宇" },
-  "wechat-official": { label: "公众号", mark: "微" },
-  custom: { label: "自定义平台", mark: "↗" },
+  x: { label: "X（Twitter）" },
+  github: { label: "GitHub" },
+  xiaohongshu: { label: "小红书" },
+  xiaoyuzhou: { label: "小宇宙" },
+  "wechat-official": { label: "公众号" },
+  custom: { label: "自定义平台" },
 } as const;
 export type SocialPlatform = keyof typeof SOCIAL_PLATFORMS;
 export interface SocialLink {
@@ -88,6 +111,8 @@ export interface CommerceConfig {
   /** 已启用的 zpay 渠道（买家在核对页选择）；缺省 ["alipay"]。 */
   paymentChannels: ("alipay" | "wxpay")[];
   subscriptionPrice: { amount: number; currency: string } | null;
+  /** 订阅按钮的图标与提示文案；null = 未配置，订阅按钮保持原样。 */
+  subscriptionHint: { icon: SubscriptionHintIcon | null; text: string | null } | null;
   refundPolicyUrl: string | null;
   /** 左栏订阅 pill 落点自定义页 slug；null = 默认名片页（/card#pricing） */
   subscribePage: string | null;
@@ -147,8 +172,6 @@ function optionalImage(value: unknown): string | null {
 export function normalizeHomeConfig(raw: unknown): HomeConfig {
   const source = isRecord(raw) ? raw : {};
 
-  const ask = optionalString(source.ask_placeholder ?? (isRecord(source.hero) ? source.hero.ask_placeholder : null), 80);
-
   const rawBadges = Array.isArray(source.fact_badges) ? source.fact_badges : [];
   const factBadges: FactBadgeConfig[] = [];
   for (const item of rawBadges) {
@@ -164,10 +187,11 @@ export function normalizeHomeConfig(raw: unknown): HomeConfig {
   const rawBlocks = Array.isArray(source.blocks) ? source.blocks : [];
   const seen = new Set<string>();
   const blocks: HomeBlockConfig[] = [];
-  let heroEnabled = rawHero.enabled !== false;
+  // 旧的整块显隐（hero.enabled / identity 块）读作横幅显隐；新保存写 banner_enabled。
+  let legacyEnabled = rawHero.enabled !== false;
   for (const item of rawBlocks) {
     if (!isRecord(item) || typeof item.type !== "string") continue;
-    if (item.type === "identity") { heroEnabled = item.enabled !== false; continue; }
+    if (item.type === "identity") { legacyEnabled = item.enabled !== false; continue; }
     const mapped: HomeBlockType | undefined = BLOCK_TYPES.has(item.type) ? (item.type as HomeBlockType) : LEGACY_TYPE[item.type];
     if (!mapped) continue;
     if (seen.has(mapped)) continue;
@@ -185,16 +209,36 @@ export function normalizeHomeConfig(raw: unknown): HomeConfig {
     if (!seen.has(fallback.type)) blocks.push({ ...fallback });
   }
 
+  const rawActions = isRecord(rawHero.actions) ? rawHero.actions : {};
+  const action = (value: unknown, fallback: boolean): HeroAction => {
+    const item = isRecord(value) ? value : {};
+    return {
+      enabled: typeof item.enabled === "boolean" ? item.enabled : fallback,
+      label: optionalString(item.label, HERO_ACTION_LABEL_MAX),
+    };
+  };
+  // 旧配置没有按钮设置：保留原问句框位置上的「和我聊聊」，并显示订阅（未定价时不渲染）。
+  const actions = { subscribe: action(rawActions.subscribe, true), chat: action(rawActions.chat, true) };
+  if (!actions.subscribe.enabled && !actions.chat.enabled) actions.chat.enabled = true;
+  const imageUrl = optionalImage(rawHero.image_url);
+  const hero: HeroConfig = {
+    subtitle: optionalString(rawHero.subtitle, HERO_SUBTITLE_MAX),
+    layout: rawHero.layout === "left" ? "left" : "center",
+    imageUrl,
+    imageAlt: imageUrl ? optionalString(rawHero.image_alt, HERO_IMAGE_ALT_MAX) : null,
+    actions,
+  };
+
   // 既有单张横幅保留为浅色版；下一次保存使用双主题字段。
   const bannerLightUrl = optionalImage(rawHero.banner_light_url ?? source.banner_url ?? rawHero.banner_url);
   const bannerDarkUrl = optionalImage(rawHero.banner_dark_url);
 
   const rawZone = isRecord(source.custom_zone) ? source.custom_zone : {};
   return {
-    askPlaceholder: ask ?? "想问什么，直接向站主的分身提问",
+    hero,
     bannerLightUrl,
     bannerDarkUrl,
-    heroEnabled,
+    bannerEnabled: typeof rawHero.banner_enabled === "boolean" ? rawHero.banner_enabled : legacyEnabled,
     customZone: {
       enabled: rawZone.enabled === true,
       html: typeof rawZone.html === "string" ? rawZone.html.slice(0, 200000) : "",
@@ -287,11 +331,15 @@ export function normalizeCommerceConfig(raw: unknown): CommerceConfig {
       currency: typeof price.currency === "string" ? price.currency : "CNY",
     };
   }
+  const hintSource = isRecord(source.subscription_hint) ? source.subscription_hint : {};
+  const hintIcon = isSubscriptionHintIcon(hintSource.icon) ? hintSource.icon : null;
+  const hintText = optionalString(hintSource.text, SUBSCRIPTION_HINT_TEXT_MAX);
   const channels = Array.isArray(source.payment_channels) ? source.payment_channels.filter((c): c is "alipay" | "wxpay" => c === "alipay" || c === "wxpay") : [];
   return {
     paymentEnabled: source.payment_enabled === true,
     paymentChannels: channels.length ? channels : ["alipay"],
     subscriptionPrice,
+    subscriptionHint: hintIcon || hintText ? { icon: hintIcon, text: hintText } : null,
     refundPolicyUrl: pageHref(source.refund_policy_page) ?? safeHref(source.refund_policy_url),
     subscribePage: pageHref(source.subscribe_page) ? (source.subscribe_page as string) : null,
   };

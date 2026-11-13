@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { OwnerAvatar } from "@/components/shared/owner-avatar";
 import { formatPrice } from "@/lib/format";
 import { SOCIAL_PLATFORMS } from "@/types/site";
+import { SocialIcon } from "@/components/card/social-icon";
 import type { CardPanelData } from "@/types/panel";
 
 /**
@@ -156,9 +157,7 @@ export function CardPanel({ card, currency = "CNY", compact = false }: { card: C
           rel="noopener noreferrer"
           className="flex items-center gap-3 rounded-2xl border bg-card p-4 shadow-xs transition-shadow hover:shadow-sm"
         >
-          <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background">
-            {SOCIAL_PLATFORMS[link.platform].mark}
-          </span>
+          <SocialIcon platform={link.platform} />
           <span className="min-w-0 flex-1">
             <span className="block text-xs text-muted-foreground">{SOCIAL_PLATFORMS[link.platform].label}</span>
             <span className="block truncate text-sm font-medium">{link.label}</span>

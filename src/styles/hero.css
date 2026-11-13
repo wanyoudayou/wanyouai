@@ -44,17 +44,27 @@
     display: block;
   }
 }
+.opc-hero {
+  container-type: inline-size;
+}
 .opc-hero__content {
+  display: grid;
+  gap: 40px;
+  max-width: 1120px;
+  margin-inline: auto;
+  padding: 72px 40px var(--opc-hero-pad-bottom);
+}
+.opc-hero__text {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 18px;
-  max-width: 960px;
+  min-width: 0;
+  max-width: 720px;
   margin-inline: auto;
-  padding: 64px 40px var(--opc-hero-pad-bottom);
   text-align: center;
 }
-.opc-hero__content h1 {
+.opc-hero__text h1 {
   max-width: 680px;
   margin: 0;
   font-size: 40px;
@@ -64,22 +74,79 @@
   white-space: pre-line;
   overflow-wrap: anywhere;
 }
-.opc-hero__content > ul {
-  justify-content: center;
+.opc-hero__subtitle {
+  max-width: 600px;
+  margin: -4px 0 0;
+  color: var(--muted-foreground);
+  font-size: 18px;
+  line-height: 1.7;
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
 }
-.opc-hero__content > :last-child {
-  justify-content: center;
+.opc-hero__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: inherit;
+  gap: 8px;
+  margin-top: 6px;
 }
-.opc-hero__question {
-  width: 100%;
-  max-width: 520px;
-  margin-top: 4px;
+.opc-hero__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+.opc-hero__hint {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.opc-hero__text > ul {
+  justify-content: center;
+  margin-top: 6px;
 }
 .opc-hero__focus {
   max-width: 620px;
   color: var(--muted-foreground);
   font-size: 13px;
   line-height: 1.7;
+}
+/* Left layout: text starts at the left edge; an optional image sits on the right. */
+.opc-hero[data-layout="left"] .opc-hero__text {
+  align-items: flex-start;
+  margin-inline: 0;
+  text-align: left;
+}
+.opc-hero[data-layout="left"] .opc-hero__buttons,
+.opc-hero[data-layout="left"] .opc-hero__text > ul {
+  justify-content: flex-start;
+}
+/* The side image only shows when it fits beside the text; narrower heroes hide it. */
+.opc-hero__figure {
+  display: none;
+  justify-self: end;
+  width: min(100%, 420px);
+}
+/* Without banner artwork, a faint rule separates the hero from the content below. */
+.opc-hero[data-banner="off"] {
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.opc-hero__picture {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 420px;
+  object-fit: contain;
+  border-radius: var(--opc-card-radius);
+  transform-origin: 50% 0;
+}
+@container (min-width: 760px) {
+  .opc-hero[data-image] .opc-hero__content {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    align-items: center;
+  }
+  .opc-hero[data-image] .opc-hero__figure {
+    display: block;
+  }
 }
 /* Uploaded pictures retain their colors; a full-bleed gradient protects the text region. */
 .opc-hero__layer[data-custom="true"]::after {
@@ -91,25 +158,19 @@
 .opc-hero__image--dark[data-custom="true"]::after {
   background: var(--opc-hero-dark-overlay);
 }
-.opc-hero__input {
-  border: 1px solid var(--input);
-  background: color-mix(in srgb, var(--background) 65%, transparent);
-  color: var(--foreground);
-  box-shadow: none;
-}
-.opc-hero__input::placeholder {
-  color: var(--muted-foreground);
-}
 @media (max-width: 767px) {
   .opc-hero {
     --opc-hero-pad-bottom: 42px;
   }
   .opc-hero__content {
-    padding: 42px 24px var(--opc-hero-pad-bottom);
-    gap: 18px;
+    padding: 48px 24px var(--opc-hero-pad-bottom);
+    gap: 28px;
   }
-  .opc-hero__content h1 {
+  .opc-hero__text h1 {
     font-size: 30px;
+  }
+  .opc-hero__subtitle {
+    font-size: 16px;
   }
   .opc-hero__focus {
     font-size: 12px;
@@ -117,40 +178,21 @@
 }
 
 /*
- * Scroll compression, enabled by HeroCollapse once it has measured the hero.
- * --opc-hero-p runs 0 (full) → 1 (only the ask box bar is left under the shell
- * header); --opc-hero-shift is how far the hero has scrolled. The section keeps
- * its full height in flow and sticks with a negative top, so nothing reflows.
+ * Scroll parallax, driven by HeroParallax: --opc-hero-shift is how far the hero
+ * has scrolled under the shell header and --opc-hero-p the same as 0…1. The
+ * backdrop and the side image trail the page; the image also shrinks to 92%.
  */
-.opc-hero[data-collapse] {
-  position: sticky;
-  top: var(--opc-hero-top, 0px);
-  z-index: 20;
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--border) calc(var(--opc-hero-p) * 100%), transparent);
+.opc-hero__art {
+  translate: 0 calc(var(--opc-hero-shift) * 0.4);
 }
-/* Artwork moves at half speed and keeps covering the visible part of the hero. */
-.opc-hero[data-collapse] .opc-hero__art {
-  translate: 0 calc(var(--opc-hero-shift) * 0.5);
-}
-/* Badges and the focus line fade first, then the title shrinks and fades. */
-.opc-hero[data-collapse] .opc-hero__content > ul,
-.opc-hero[data-collapse] .opc-hero__focus {
-  opacity: clamp(0, calc(1 - var(--opc-hero-p) / 0.45), 1);
-}
-.opc-hero[data-collapse] .opc-hero__content h1 {
-  opacity: clamp(0, calc(1 - (var(--opc-hero-p) - 0.2) / 0.55), 1);
-  scale: calc(1 - min(var(--opc-hero-p), 0.8) * 0.3);
-  transform-origin: 50% 100%;
-}
-/* The ask box slides from the content padding into the centre of the bar. */
-.opc-hero[data-collapse] .opc-hero__question {
-  translate: 0 calc(var(--opc-hero-p) * (var(--opc-hero-pad-bottom) - var(--opc-hero-bar-gap, 12px)));
+.opc-hero__picture {
+  translate: 0 calc(var(--opc-hero-shift) * 0.25);
+  scale: calc(1 - var(--opc-hero-p) * 0.08);
 }
 @media (prefers-reduced-motion: reduce) {
-  .opc-hero[data-collapse] .opc-hero__art {
+  .opc-hero__art,
+  .opc-hero__picture {
     translate: none;
-  }
-  .opc-hero[data-collapse] .opc-hero__content h1 {
     scale: none;
   }
 }

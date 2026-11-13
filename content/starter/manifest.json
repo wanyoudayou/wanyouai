@@ -37,6 +37,31 @@
       "source": "content/starter/navigation.md"
     },
     {
+      "slug": "getting-started-avatar",
+      "title": "站主 AI 分身",
+      "source": "content/starter/avatar.md"
+    },
+    {
+      "slug": "getting-started-skills",
+      "title": "Skill 发布与在线运行",
+      "source": "content/starter/skills-online.md"
+    },
+    {
+      "slug": "getting-started-pages",
+      "title": "AI 生成自定义页面",
+      "source": "content/starter/custom-pages.md"
+    },
+    {
+      "slug": "getting-started-sections",
+      "title": "AI 生成代码栏目",
+      "source": "content/starter/code-sections.md"
+    },
+    {
+      "slug": "getting-started-obsidian",
+      "title": "Obsidian 写作与发布",
+      "source": "content/starter/obsidian.md"
+    },
+    {
       "slug": "getting-started-optional",
       "title": "可选功能与部署检查",
       "source": "docs/deployment/guide.md",

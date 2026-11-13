@@ -70,6 +70,10 @@ for (const row of upgradeRows) {
   cursor = next;
 }
 assert.equal(versions[cursor], release.schema_version, "Upgrade table does not reach the release version");
+if (release.release_upgrade) {
+  assert(versions.includes(release.release_upgrade.from) && release.release_upgrade.from !== release.schema_version, "Release upgrade must start from an earlier migration version");
+  assert((await readFile("docs/operations/database-upgrade.md", "utf8")).includes(`(../../supabase/${release.release_upgrade.file})`), "Upgrade guide must link the release upgrade file");
+}
 console.log(`database upgrade chain ok: ${upgradeRows.length} steps`);
 
 const envExample = await readFile(".env.example", "utf8");

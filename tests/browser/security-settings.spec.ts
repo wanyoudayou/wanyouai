@@ -75,26 +75,27 @@ for (const width of [320, 1440]) for (const theme of ["light", "dark"] as const)
   });
 }
 
-test("anonymous hero: verification failure can retry; cancellation keeps the original question", async ({ page }) => {
+test("anonymous hero chat: opens the drawer composer; verification failure can retry and cancellation keeps the question", async ({ page }) => {
   await page.route("https://challenges.cloudflare.com/**", route => route.fulfill({ contentType: "application/javascript", body: syntheticChallenge }));
   const payloads = await mockAvatar(page);
   await page.setViewportSize({ width: 390, height: 900 });
   await page.goto("/blog/anonymous-ai");
-  const hero = page.getByRole("textbox", { name: "向站主的分身提问", exact: true });
-  await hero.fill("首页问题需要保留。");
-  await page.getByRole("button", { name: "提问", exact: true }).click();
+  await page.getByRole("button", { name: "和我聊聊", exact: true }).click();
+  const composer = page.getByRole("dialog", { name: "站主分身", exact: true }).getByRole("textbox", { name: "向站主的分身提问", exact: true });
+  await expect(composer).toBeFocused();
+  await composer.fill("首页问题需要保留。");
+  await composer.press("Enter");
   const challenge = page.getByRole("dialog", { name: "发送前请完成人机验证" });
   await challenge.getByRole("button", { name: "模拟校验失败" }).click();
   await expect(challenge.getByRole("alert")).toContainText("问题尚未发送");
   expect(payloads).toHaveLength(0);
   await challenge.getByRole("button", { name: "取消发送" }).click();
-  await expect(hero).toHaveValue("首页问题需要保留。");
-  await page.getByRole("button", { name: "提问", exact: true }).click();
+  await expect(composer).toHaveValue("首页问题需要保留。");
+  await composer.press("Enter");
   await challenge.getByRole("button", { name: "模拟校验失败" }).click();
   await challenge.getByRole("button", { name: "重新验证" }).click();
   await challenge.getByRole("button", { name: "完成测试校验" }).click();
   await expect(challenge).toHaveCount(0);
-  await expect(page.getByRole("dialog", { name: "站主分身", exact: true })).toBeVisible();
   await expect(page.getByText("这是合成分身回答。", { exact: true }).filter({ visible: true })).toBeVisible();
   expect(payloads).toHaveLength(1);
   expect(payloads[0].question).toBe("首页问题需要保留。");
@@ -103,9 +104,11 @@ test("anonymous hero: verification failure can retry; cancellation keeps the ori
 test("anonymous AI: challenge script failure has a recoverable state and sends nothing", async ({ page }) => {
   await page.route("https://challenges.cloudflare.com/**", route => route.abort());
   const payloads = await mockAvatar(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/blog/anonymous-ai");
-  await page.getByRole("textbox", { name: "向站主的分身提问", exact: true }).first().fill("验证资源加载失败时保留。");
-  await page.getByRole("button", { name: "提问", exact: true }).click();
+  const composer = page.getByRole("textbox", { name: "向站主的分身提问", exact: true }).last();
+  await composer.fill("验证资源加载失败时保留。");
+  await composer.press("Enter");
   const challenge = page.getByRole("dialog", { name: "发送前请完成人机验证" });
   await expect(challenge.getByRole("alert")).toContainText("问题尚未发送");
   expect(payloads).toHaveLength(0);

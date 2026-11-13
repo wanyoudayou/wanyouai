@@ -577,12 +577,15 @@ export function RightPanelProvider({
   avatarAnonymous,
   turnstileSiteKey,
   loggedIn,
+  homeCollapsed = false,
   children,
 }: {
   avatarEnabled: boolean;
   avatarAnonymous: boolean;
   turnstileSiteKey: string | null;
   loggedIn: boolean;
+  /** 首页 Hero 提供「和我聊聊」时，首页右栏默认收起；访客自己展开或收起后，本次访问沿用其选择。 */
+  homeCollapsed?: boolean;
   children: React.ReactNode;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -590,7 +593,9 @@ export function RightPanelProvider({
   const [placeholder, setPlaceholder] = useState<PanelPlaceholder>({
     kind: "default",
   });
-  const [collapsed, setCollapsed] = useState(false);
+  const providerPath = usePathname();
+  const [collapseChoice, setCollapsed] = useState<boolean | null>(null);
+  const collapsed = collapseChoice ?? (homeCollapsed && providerPath === "/");
   const [verifying, setVerifying] = useState(false);
   const requestRunning = useRef(false);
   const askController = useRef<AbortController | null>(null);

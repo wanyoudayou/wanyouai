@@ -15,6 +15,8 @@ export type StarterStatus = {
   started: boolean;
   empty: boolean;
   count: number;
+  /** Chapters in the bundled template. */
+  total: number;
 };
 export async function getStarterStatus(): Promise<StarterStatus> {
   if (!(await getAdminIdentity()).owner) throw new Error("需要站主身份");
@@ -41,6 +43,7 @@ export async function getStarterStatus(): Promise<StarterStatus> {
       started: !!job.data,
       empty: !articles.count && !pages.count && !series.count,
       count: Number(job.data?.published_count ?? 0),
+      total: template.articles.length,
     };
   } catch {
     return {
@@ -49,6 +52,7 @@ export async function getStarterStatus(): Promise<StarterStatus> {
       started: false,
       empty: false,
       count: 0,
+      total: template.articles.length,
     };
   }
 }
@@ -81,7 +85,7 @@ export async function publishNextStarterChapter() {
     .eq("id", template.id)
     .single();
   if (job.error || !job.data) throw new Error("STARTER_UNAVAILABLE");
-  if (job.data.completed) return { count: articles.length, completed: true };
+  if (job.data.completed) return { count: articles.length, total: articles.length, completed: true };
   const input = articles[Number(job.data.published_count)];
   if (!input) throw new Error("STARTER_CONTENT_CHANGED");
   const store = createPublisherStore();
@@ -121,6 +125,7 @@ export async function publishNextStarterChapter() {
   if (after.error || !after.data) throw new Error("STARTER_UNAVAILABLE");
   return {
     count: Number(after.data.published_count),
+    total: articles.length,
     completed: after.data.completed === true,
   };
 }

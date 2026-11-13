@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DeleteArticle } from "@/components/admin/delete-article";
 import { notFound } from "next/navigation";
 import { requireOwner, numericId, adminReturn } from "@/lib/admin/detail";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -24,12 +25,16 @@ export default async function Page({
   const { data: a, error } = await client
     .from("articles")
     .select(
-      "id,slug,title,status,access,type,updated_at,paused_at,price,featured",
+      "id,slug,title,status,access,type,updated_at,paused_at,price,featured,series_id",
     )
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error("文章暂时不可用");
   if (!a) notFound();
+  const parent = a.series_id
+    ? await client.from("series").select("readme_article_id").eq("id", a.series_id).maybeSingle()
+    : { data: null, error: null };
+  if (parent.error) throw new Error("文章暂时不可用");
   const base = () =>
     client
       .from("article_versions")
@@ -68,6 +73,15 @@ export default async function Page({
           versions={versions ?? []}
         />
       </div>
+      {(a.type === "blog" || a.type === "chapter") && (
+        <DeleteArticle
+          id={a.id}
+          updated={a.updated_at}
+          access={a.access}
+          readme={parent.data?.readme_article_id === a.id}
+          after={adminReturn(raw.returnTo, "/admin/articles")}
+        />
+      )}
       <h2 className="text-lg font-medium">版本历史</h2>
       <AdminDataTable
         rows={(versions ?? []).map((v) => ({

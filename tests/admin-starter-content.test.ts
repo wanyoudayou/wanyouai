@@ -86,14 +86,14 @@ test("starter resumes after lost responses, preserves one version and activates 
       )
     ).rows[0];
     assert.equal(job.completed, true);
-    assert.equal(job.published_count, 8);
+    assert.equal(job.published_count, inputs.length);
     assert.equal(
       (
         await db.query<{ n: number }>(
           "select count(*)::int n from public.article_versions where article_id in(select id from public.articles where slug like 'getting-started-%')",
         )
       ).rows[0].n,
-      8,
+      inputs.length,
     );
     await prepare(db);
     assert.equal(
@@ -138,7 +138,7 @@ test("starter resumes after lost responses, preserves one version and activates 
           "select count(*)::int n from public.article_bodies b join public.articles a on a.id=b.article_id where a.slug like 'getting-started-%'",
         )
       ).rows[0].n,
-      8,
+      inputs.length,
     );
   } finally {
     await db.close();
@@ -187,12 +187,12 @@ test("starter stops final activation when a previously published chapter was edi
   try {
     await db.exec("set role service_role");
     await prepare(db);
-    for (const input of inputs.slice(0, 7)) await publish(input, store(db));
+    for (const input of inputs.slice(0, -1)) await publish(input, store(db));
     await db.exec(
       "update public.articles set title='Retained user edit' where slug='getting-started-overview'",
     );
     await assert.rejects(
-      publish(inputs[7], store(db)),
+      publish(inputs.at(-1)!, store(db)),
       /STARTER_CONTENT_CHANGED/,
     );
     assert.equal(
@@ -209,7 +209,7 @@ test("starter stops final activation when a previously published chapter was edi
           "select published_count from public.starter_imports",
         )
       ).rows[0].published_count,
-      7,
+      inputs.length - 1,
     );
     assert.equal(
       (

@@ -113,6 +113,7 @@ shasum -a 256 -c SHA256SUMS
 2. 从交付包完成干净安装和构建；保留同提交 CI、真实流程、已复用证据与已知限制记录。
 3. 更新官网部署与使用指南，核对 Source、配置、内容权限和交付功能；记录上一兼容部署作为回滚点。
 4. 在公开仓库对生成交付包的提交打版本标签（`git tag v版本号 && git push origin v版本号`），准备 GitHub Release 草稿，附件使用上述同一组工件。仓库公开前确认具体公开范围，并在公开后启用私密漏洞反馈和 main 必需检查。
+5. 发布后在开发仓库把 `scripts/build-database-baseline.mjs` 的 `RELEASE_BASE` 改为本次发布的数据库版本、删除旧的 `*-to-latest.sql` 并运行 `npm run db:baseline`：之后新增的迁移会合并进 `supabase/upgrades/<RELEASE_BASE>-to-latest.sql`，上一版本的部署者只需执行这一个文件和 `verify.sql`。发布说明链接该文件与[升级指南](../operations/database-upgrade.md)。
 5. 发布后以匿名身份打开仓库、README 部署按钮、指南和下载链接，下载后核对 SHA-256。使用两个仓库时官网继续从开发仓库部署，公开仓库只经导出更新；只用一个仓库时官网从公开仓库 main 部署。
 
 公开文档只说明当前操作和限制；原始日志、截图、交易和个人信息保存在受限本地归档，不作为应用、测试或打包输入。

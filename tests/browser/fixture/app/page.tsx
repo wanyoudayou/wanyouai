@@ -6,8 +6,8 @@ export default function Page() {
     <>
       <HeroCard
         oneLiner="让知识与服务，成为你的事业。"
+        hero={{ subtitle: "把经验整理成手册、技能与服务，读者按需阅读与合作。", layout: "center", imageUrl: null, imageAlt: null, actions: { subscribe: { enabled: true, label: null }, chat: { enabled: true, label: null } } }}
         facts={[]}
-        askPlaceholder="想了解什么？"
         focusAreas={["产品设计", "独立创作"]}
         exclusions={[]}
         bannerLightUrl={null}

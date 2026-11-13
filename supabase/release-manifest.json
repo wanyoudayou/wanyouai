@@ -7,8 +7,13 @@
     "file": "upgrades/20261010053221-to-payment-reference.sql",
     "sha256": "5ccc995d636e6aaab327ebc800b805a3b13a0af76ae156698745d32d001b43d8"
   },
+  "release_upgrade": {
+    "from": "20261112090000",
+    "file": "upgrades/20261112090000-to-latest.sql",
+    "sha256": "1ab2c2b3e23ba73418c9f04aaa3d2cc0f78b38e6a560cfec2c2ce6829979ac6b"
+  },
   "format": "wanyou.database/1",
-  "schema_version": "20261112090000",
+  "schema_version": "20261113120000",
   "migrations": [
     {
       "file": "20260928124423_release_baseline.sql",
@@ -117,12 +122,20 @@
     {
       "file": "20261112090000_navigation_groups.sql",
       "sha256": "7c8977cef1be9cde90bc9f27e5344c8f022eda089ec4939e36de76170af82ea4"
+    },
+    {
+      "file": "20261113090000_starter_chapter_count.sql",
+      "sha256": "13e732ad1d5eef4d3d74c4f76416250490c4d0a6236b7621d19df8c1b23ce8c8"
+    },
+    {
+      "file": "20261113120000_content_delete_and_chapter_order.sql",
+      "sha256": "fbc07afc752779b7d7b68b6098b25585aa4bab328bced741dff35103f3bb9441"
     }
   ],
   "artifacts": {
-    "baseline.sql": "35d2cf40d3672d6d8a9bfd78e32f305ed9bfff66ff8cf5e6169595e5e7de1ca4",
-    "install.sql": "7cd452a37729bfd244df53861476bc5d8a5eefd3a6322812304f756e5becadb4",
+    "baseline.sql": "51314f062b60a991d1123a396913915ea7164e83a6692537d1981ff02612b42e",
+    "install.sql": "47dc62bb24fa007d9b23d9dd6549ad44213423f60720858b1af504e4d7ee9e94",
     "demo.sql": "bea1e0c534825e7aa655143d136b0b10ff002f17379d707ba9992e1c9c0fa7ec",
-    "verify.sql": "1e811f5917d8828e60e6ea8375eba5802aa8fdc16c810886501b75c3bc0880b9"
+    "verify.sql": "54f5359ae488d93473e4d75c72697b9e44e7044982e03c76c94f20d0f1663d40"
   }
 }

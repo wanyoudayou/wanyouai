@@ -7,6 +7,7 @@ import { sendPauseNotice } from "@/lib/admin/pause-notice";
 import { revalidatePath } from "next/cache";
 import { getAdminIdentity } from "@/lib/admin/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { parseSeriesInput } from "@/lib/admin/series-input";
 
 function refreshContent() {
@@ -200,5 +201,53 @@ export async function saveEventDetails(
     return { ok: data.ok === true, message: String(data.message) };
   } catch {
     return { ok: false, message: "保存中断，请刷新确认状态后重试。" };
+  }
+}
+
+/** Deletes a free blog post or chapter that nobody has paid for; the database enforces the rule. */
+export async function deleteArticle(
+  _previous: { ok: boolean; message: string },
+  form: FormData,
+) {
+  try {
+    if (!(await getAdminIdentity()).owner)
+      return { ok: false, message: "需要站主身份" };
+    const id = String(form.get("id") ?? ""),
+      updated = String(form.get("updated") ?? "");
+    if (!/^\d+$/.test(id) || !Number.isFinite(Date.parse(updated)) || form.get("confirm") !== "on")
+      return { ok: false, message: "请勾选确认后再删除。" };
+    const { data, error } = await createSupabaseServiceClient().rpc("delete_free_article", {
+      p_id: Number(id),
+      p_expected_updated_at: updated,
+    });
+    if (error || !data || typeof data.ok !== "boolean")
+      return { ok: false, message: "删除暂时不可用，请确认数据库升级已完成后重试。" };
+    if (!data.ok) return { ok: false, message: String(data.message) };
+    refreshContent();
+    for (const path of ["/llms.txt", "/card", "/card.json"]) revalidatePath(path);
+    return { ok: true, message: "已删除。网址标识已释放，可以用它重新创建内容。" };
+  } catch {
+    return { ok: false, message: "删除中断，请刷新确认内容状态后重试。" };
+  }
+}
+
+/** Saves the reading order of every chapter in one album. */
+export async function orderChapters(seriesId: number, ids: number[]) {
+  try {
+    if (!(await getAdminIdentity()).owner)
+      return { ok: false, message: "需要站主身份" };
+    if (!Number.isSafeInteger(seriesId) || seriesId <= 0 || !Array.isArray(ids) || !ids.length || ids.length > 1000
+      || !ids.every((id) => Number.isSafeInteger(id) && id > 0))
+      return { ok: false, message: "章节顺序无效，请刷新后重试。" };
+    const { error } = await createSupabaseServiceClient().rpc("order_series_chapters", {
+      p_series: seriesId,
+      p_ids: ids,
+    });
+    if (error) return { ok: false, message: "章节已变化，请刷新后重新排序。" };
+    refreshContent();
+    for (const path of ["/llms.txt", "/card", "/card.json"]) revalidatePath(path);
+    return { ok: true, message: "章节顺序已保存。" };
+  } catch {
+    return { ok: false, message: "保存中断，请刷新确认顺序后重试。" };
   }
 }

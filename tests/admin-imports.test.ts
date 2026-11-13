@@ -51,8 +51,16 @@ test('pending revisions isolate content, serialize versions, publish idempotentl
   assert.equal((await db.query<{content:string}>("select content from article_bodies where article_id=(select id from articles where slug='import-first')")).rows[0].content,snapshot.markdown);
   await assert.rejects(stage('c',id,'stale-save'),/IMPORT_STALE/);
   const fileId=(await db.query<{file_id:number}>('select file_id from content_file_revisions where id=$1',[id])).rows[0].file_id;
-  await db.query("select order_content_files('series:demo-selection-handbook',$1::bigint[])",[[fileId]]);
-  await assert.rejects(db.query("select order_content_files('series:demo-selection-handbook',array[999]::bigint[])"),/ORDER_STALE/);
+  const album=(await db.query<{id:number}>("select id from series where slug='demo-selection-handbook'")).rows[0].id;
+  const ids=(await db.query<{id:number}>('select id from articles where series_id=$1 order by sort_order,id',[album])).rows.map(r=>r.id);
+  await db.query('select order_series_chapters($1,$2::bigint[])',[album,[...ids].reverse()]);
+  assert.deepEqual((await db.query<{id:number}>('select id from articles where series_id=$1 order by sort_order,id',[album])).rows.map(r=>r.id),[...ids].reverse());
+  const position=(await db.query<{sort:number;sort_order:number}>("select f.sort,a.sort_order from content_files f join articles a on a.slug=f.article_slug where f.id=$1",[fileId])).rows[0];
+  assert.equal(position.sort,position.sort_order);
+  // Reordering rebases the pending revision, so it is still publishable.
+  assert.equal((await db.query<{ok:boolean}>("select r.base_updated_at=a.updated_at ok from content_file_revisions r join articles a on a.slug='import-first' where r.id=$1",[revision2])).rows[0].ok,true);
+  await assert.rejects(db.query('select order_series_chapters($1,$2::bigint[])',[album,ids.slice(1)]),/ORDER_STALE/);
+  await assert.rejects(db.query('select order_series_chapters($1,array[999]::bigint[])',[album]),/ORDER_STALE/);
   await db.exec("update articles set title='Concurrent edit' where slug='import-first'");
   const stale=await db.query<{r:PublishResponse}>('select commit_file_publication($1,$2::jsonb) as r',[revision2,'{}']);
   assert.equal(stale.rows[0].r.status,'blocked');

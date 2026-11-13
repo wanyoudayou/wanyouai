@@ -112,6 +112,7 @@ export default async function RootLayout({
             avatarEnabled={site.avatar.enabled}
             avatarAnonymous={site.avatar.anonymousEntry}
             turnstileSiteKey={turnstile?.enabled ? turnstile.siteKey : null}
+            homeChat={site.home.hero.actions.chat.enabled && site.avatar.enabled}
             footer={{
               siteName: site.siteName,
               credit: site.footerCredit,

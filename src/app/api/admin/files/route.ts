@@ -11,7 +11,6 @@ import {
   publishRevision,
   uploadAsset,
   linkLibraryAsset,
-  orderFiles,
 } from "@/lib/importing/server";
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -80,8 +79,6 @@ export async function POST(request: Request) {
           data.expected,
         ),
       );
-    if (data.op === "order" && typeof data.scope === "string")
-      return reply(await orderFiles(data.scope, data.ids));
     if (data.op === "compare")
       return reply(await inspectCandidate(data.candidate));
     if (

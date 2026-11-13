@@ -8,6 +8,7 @@ import {
   type SeriesSettings,
 } from "@/components/admin/series-settings-form";
 import { EventDetailsForm } from "@/components/admin/event-details-form";
+import { ChapterOrder } from "@/components/admin/chapter-order";
 import { AdminResourcePage } from "@/components/admin/admin-resource-page";
 import type { RawListQuery } from "@/lib/admin/list-query";
 import { readRelatedPages } from "@/lib/admin/related-pages";
@@ -56,6 +57,8 @@ export default async function Page({
   if (error) throw new Error("专辑暂时不可用");
   if (!s) notFound();
   const chapters = await readRelatedPages((from, to) => client.from("articles").select("id,slug,title").eq("series_id", id).eq("access", "public").in("status", ["published", "paused"]).order("sort_order").order("id").range(from, to));
+  const ordered = await readRelatedPages((from, to) => client.from("articles").select("id,title,status").eq("series_id", id).order("sort_order").order("id").range(from, to));
+  if (ordered.error) throw new Error("章节暂时不可用");
   const event =
     s.type === "event"
       ? await client
@@ -120,6 +123,13 @@ export default async function Page({
           </>
         )}
       </div>
+      {s.status !== "archived" && (
+        <ChapterOrder
+          key={(ordered.data ?? []).map((chapter) => chapter.id).join(",")}
+          seriesId={id}
+          chapters={(ordered.data ?? []).map((chapter) => ({ id: Number(chapter.id), title: String(chapter.title), status: String(chapter.status) }))}
+        />
+      )}
       <AdminResourcePage
         resource="articles"
         params={{ ...(await searchParams), series: s.slug }}

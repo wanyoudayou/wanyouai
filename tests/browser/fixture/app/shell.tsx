@@ -28,7 +28,8 @@ export function FixtureShell({ children }: { children: ReactNode }) {
           ],
         },
       ]}
-      subscribe={{ enabled: false, priceText: "¥99 / 年", href: "/p/pricing" }}
+      subscribe={{ enabled: pathname === "/hero-layout", priceText: "¥99 / 年", href: "/p/pricing" }}
+      homeChat
       avatarEnabled
       avatarAnonymous={anonymousAi || memberAi}
       turnstileSiteKey={anonymousAi || memberAi ? "synthetic-site-key-a" : null}

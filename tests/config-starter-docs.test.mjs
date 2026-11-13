@@ -12,7 +12,9 @@ const parse = markdown => unified().use(remarkParse).use(remarkGfm).parse(markdo
 test("default handbook preserves stable public chapter identities and excludes private maintenance sources", () => {
   assert.deepEqual(template.articles.map(article => article.frontmatter.slug), [
     "getting-started-overview", "getting-started-preparation", "getting-started-supabase", "getting-started-vercel",
-    "getting-started-publishing", "getting-started-navigation", "getting-started-optional", "getting-started-maintenance",
+    "getting-started-publishing", "getting-started-navigation", "getting-started-avatar", "getting-started-skills",
+    "getting-started-pages", "getting-started-sections", "getting-started-obsidian", "getting-started-optional",
+    "getting-started-maintenance",
   ]);
   for (const article of template.articles) {
     assert.equal(article.frontmatter.access, "public");

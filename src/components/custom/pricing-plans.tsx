@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight, Check, Handshake } from "lucide-react";
 import { PurchaseButton } from "@/components/reading/purchase-button";
+import { SubscriptionHint, subscriptionHintIcon } from "@/components/reading/subscription-hint";
 import { formatPrice } from "@/lib/format";
 import type { SiteContext } from "@/lib/get-site-config";
 import "@/styles/pricing.css";
@@ -24,7 +25,7 @@ export function PricingPlans({
 }: {
   commerce: Pick<
     SiteContext["commerce"],
-    "paymentEnabled" | "subscriptionPrice"
+    "paymentEnabled" | "subscriptionPrice" | "subscriptionHint"
   >;
 }) {
   const price = commerce.subscriptionPrice;
@@ -80,10 +81,12 @@ export function PricingPlans({
             <div className="pricing-plan__purchase">
               <PurchaseButton
                 skuType="subscription"
+                icon={subscriptionHintIcon(commerce)}
                 label="购买年度订阅"
                 enabled={!!price && commerce.paymentEnabled}
               />
             </div>
+            <SubscriptionHint commerce={commerce} className="pricing-plan__hint" />
             <p className="pricing-plan__note">
               {!price
                 ? "站主尚未设置订阅方案。"

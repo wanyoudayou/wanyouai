@@ -3,6 +3,8 @@ import { getHomeData } from "@/lib/get-home";
 import { buildCardPanelData } from "@/lib/get-card";
 import { PanelPlaceholder } from "@/components/shell/panel-placeholder";
 import { HeroCard } from "@/components/home/hero-card";
+import { subscriptionHintIcon } from "@/components/reading/subscription-hint";
+import { subscriptionHintLine } from "@/lib/subscription-hint";
 import { CustomHtmlWithWidgets } from "@/components/custom/custom-html-widgets";
 import { SectionHeader } from "@/components/home/section-header";
 import { CardGrid } from "@/components/cards/card-grid";
@@ -134,18 +136,21 @@ export default async function Home() {
     }
   };
 
-  // 名片 Hero 是固定首屏（不参与五块排序）；五块 = 博客/手册/技能/活动/服务
-  const hero = site.home.heroEnabled ? (
+  // 名片 Hero 是固定首屏（始终显示，不参与五块排序）；五块 = 博客/手册/技能/活动/服务
+  const hero = (
     <HeroCard
       oneLiner={site.identity.oneLiner}
+      hero={site.home.hero}
       facts={data.facts}
-      askPlaceholder={site.home.askPlaceholder}
+      subscribeIcon={subscriptionHintIcon(site.commerce)}
+      subscribeHint={subscriptionHintLine(site.commerce.subscriptionPrice, site.commerce.subscriptionHint)}
       focusAreas={site.identity.focusAreas}
       exclusions={site.constraints.exclusions}
       bannerLightUrl={site.home.bannerLightUrl}
       bannerDarkUrl={site.home.bannerDarkUrl}
+      bannerEnabled={site.home.bannerEnabled}
     />
-  ) : null;
+  );
   const rest = site.home.blocks;
 
   return (

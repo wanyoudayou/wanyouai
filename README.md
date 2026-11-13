@@ -39,7 +39,7 @@ supabase/install.sql
 supabase/verify.sql
 ```
 
-SQL 安装生成空白站点，不预设站主或价格。首次认领站主后，`/admin/setup` 默认勾选“载入示例内容”，可导入八篇免费使用指南与可编辑收费方案页，也可取消后从空站开始。指南的安装、配置与维护章节由同一份部署文档生成，导入后可自行编辑，代码升级不覆盖站主修改；[来源说明](content/starter/README.md)列出章节与维护位置。执行 `verify.sql` 后，检查返回结果，每行 `passed` 都必须为 `true`；出现 `false` 或 SQL 错误时停止部署并排查。版本与 SHA-256 见[发布清单](supabase/release-manifest.json)。支持 PostgreSQL 17+。
+SQL 安装生成空白站点，不预设站主或价格。首次认领站主后，`/admin/setup` 默认勾选“载入示例内容”，可导入十三篇免费使用指南与可编辑收费方案页，也可取消后从空站开始。指南的安装、配置与维护章节由同一份部署文档生成，导入后可自行编辑，代码升级不覆盖站主修改；[来源说明](content/starter/README.md)列出章节与维护位置。执行 `verify.sql` 后，检查返回结果，每行 `passed` 都必须为 `true`；出现 `false` 或 SQL 错误时停止部署并排查。版本与 SHA-256 见[发布清单](supabase/release-manifest.json)。支持 PostgreSQL 17+。
 
 已有实例先备份，再按[数据库安装与升级](supabase/README.md)识别版本、应用缺失迁移；**不能重跑 install.sql**。支付升级需停收款并核对待付单，分身配额升级需排空旧请求。SQL Editor 安装不会建立 CLI 历史，未对齐前不能直接 `db push`。`supabase/legacy/` 仅供旧版升级与等价回放，新装不执行其中脚本。
 

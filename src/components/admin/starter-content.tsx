@@ -22,8 +22,8 @@ export function StarterContent({ status }: { status: StarterStatus }) {
     setBusy(true);
     let current = count;
     try {
-      for (let i = 0; i < 8 && !stop.current; i++) {
-        setMessage(`正在确认进度并导入，已完成 ${current}/8 篇…`);
+      for (let i = 0; i < status.total && !stop.current; i++) {
+        setMessage(`正在确认进度并导入，已完成 ${current}/${status.total} 篇…`);
         let timer: ReturnType<typeof setTimeout> | undefined;
         const result = await Promise.race([
           initializeStarterStep(),
@@ -60,7 +60,7 @@ export function StarterContent({ status }: { status: StarterStatus }) {
     >
       <h2 className="text-lg font-semibold">开始使用本站系统</h2>
       <p className="text-sm leading-6 text-muted-foreground">
-        创建可编辑的收费方案页与八篇使用指南，完成后加入侧栏。已有内容不会被覆盖，升级不会自动导入。
+        {status.completed ? "收费方案页与使用指南已创建。" : `创建可编辑的收费方案页与 ${status.total} 篇使用指南，完成后加入侧栏。`}已有内容不会被覆盖，升级不会自动导入。
       </p>
       {!status.available ? (
         <p role="alert" className="text-sm">
@@ -92,7 +92,7 @@ export function StarterContent({ status }: { status: StarterStatus }) {
           <div className="flex flex-wrap gap-3">
             <Button onClick={start} disabled={busy}>
               {busy
-                ? `导入中 ${count}/8`
+                ? `导入中 ${count}/${status.total}`
                 : status.started
                   ? "继续导入"
                   : selected

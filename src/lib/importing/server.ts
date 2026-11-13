@@ -515,23 +515,3 @@ async function saveAssetBinding(
   return { hash };
 }
 
-export async function orderFiles(scope: string, ids: number[], context?: ImportContext) {
-  await importScope(scope, false, context);
-  if (
-    !Array.isArray(ids) ||
-    ids.length > 1000 ||
-    !ids.every((id) => Number.isSafeInteger(id) && id > 0)
-  )
-    throw new ImportError("文件顺序无效。");
-  const { error } = await createSupabaseServiceClient().rpc(
-    "order_content_files",
-    { p_scope: scope, p_ids: ids },
-  );
-  if (error) throw new ImportError("目录已变化，请刷新后重新排序。");
-  const store = createPublisherStore();
-  store.revalidate("/admin");
-  if (scope.startsWith("series:"))
-    for (const type of ["collections", "handbooks", "skills", "events"])
-      store.revalidate("/" + type + "/" + scope.slice(7));
-  return { ok: true };
-}

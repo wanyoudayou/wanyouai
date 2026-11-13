@@ -1,14 +1,14 @@
 "use client";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 /** 就地购买 CTA（页面契约 2.5）：POST /api/orders → 201 进核对页；409 去 /me。 */
-export function PurchaseButton({ skuType, targetId, label, enabled = true }: { skuType: "subscription" | "series" | "single" | "skill" | "event"; targetId?: number | null; label: string; enabled?: boolean }) {
+export function PurchaseButton({ skuType, targetId, label, icon = null, enabled = true }: { skuType: "subscription" | "series" | "single" | "skill" | "event"; targetId?: number | null; label: string; icon?: ReactNode; enabled?: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  if (!enabled) return <Button size="sm" disabled title="在线收款配置完成后开通">{label}</Button>;
+  if (!enabled) return <Button size="sm" disabled title="在线收款配置完成后开通">{icon}{label}</Button>;
   async function buy() {
     setBusy(true); setMessage("");
     try {
@@ -20,5 +20,5 @@ export function PurchaseButton({ skuType, targetId, label, enabled = true }: { s
     } catch { setMessage("网络异常，请稍后重试。"); }
     setBusy(false);
   }
-  return <span className="inline-flex flex-col gap-1"><Button size="sm" disabled={busy} onClick={buy}>{busy ? "正在创建订单…" : label}</Button>{message ? <p role="alert" className="text-xs text-muted-foreground">{message}</p> : null}</span>;
+  return <span className="inline-flex flex-col gap-1"><Button size="sm" disabled={busy} onClick={buy}>{busy ? "正在创建订单…" : <>{icon}{label}</>}</Button>{message ? <p role="alert" className="text-xs text-muted-foreground">{message}</p> : null}</span>;
 }

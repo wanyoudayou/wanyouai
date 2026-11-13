@@ -4,6 +4,7 @@ import { getSiteConfig } from "@/lib/get-site-config";
 import { formatPrice } from "@/lib/format";
 import { PurchaseButton } from "@/components/reading/purchase-button";
 import { PricingPlans } from "./pricing-plans";
+import { SubscriptionHint, subscriptionHintIcon } from "@/components/reading/subscription-hint";
 
 export async function CustomHtmlWithWidgets({ html }: { html: string }) {
   const clean = sanitizeCustomHtml(html);
@@ -19,6 +20,7 @@ export async function CustomHtmlWithWidgets({ html }: { html: string }) {
           <div className="flex flex-wrap items-center gap-3 py-3">
             <PurchaseButton
               skuType="subscription"
+              icon={subscriptionHintIcon(site.commerce)}
               label={
                 price
                   ? `订阅 ${formatPrice(price.amount, price.currency)} / 年`
@@ -29,6 +31,7 @@ export async function CustomHtmlWithWidgets({ html }: { html: string }) {
             <span className="text-sm text-muted-foreground">
               购买前需登录；已有权益可在会员中心查看。
             </span>
+            <SubscriptionHint commerce={site.commerce} className="basis-full" />
           </div>
         ),
       })}

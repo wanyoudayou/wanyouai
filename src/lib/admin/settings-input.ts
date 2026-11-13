@@ -1,6 +1,7 @@
 import Ajv2020 from "ajv/dist/2020.js";
 import { sanitizeCustomHtml } from "@/lib/custom-pages/sanitize";
 import { PAYMENT_CURRENCY } from "@/lib/format";
+import { HERO_SUBTITLE_MAX, ONE_LINER_MAX } from "@/types/site";
 import addFormats from "ajv-formats";
 import schema from "../../../docs/contracts/site-config.schema.json";
 const ajv = new Ajv2020({ strict: false, allErrors: true });
@@ -8,9 +9,10 @@ addFormats(ajv);
 
 /**
  * 站点配置双解析器（名片与站点分别保存）：
- * - parseCardSettings：名片基础 + identity + contact（保存只写 site_name/owner_name/identity/contact 四列）；
- * - parseSiteSettings：首页与商业配置（保存只写 tagline/footer_credit/home_config/commerce）。
- * 两个表单按列域更新，互不覆盖。
+ * - parseCardSettings：站主 + identity 中名片字段 + contact + constraints；
+ * - parseSiteSettings：站名、Logo 与小标题、一句话、首页与商业配置。
+ * identity 由两页分键拥有：一句话与 Logo 归站点配置（SITE_IDENTITY_KEYS），其余归名片；
+ * 保存时按版本读出当前 identity 合并本页字段（mergeIdentity），两页互不覆盖。
  */
 
 const value = (form: FormData, name: string) =>
@@ -89,14 +91,34 @@ function parseSocialLinks(form: FormData) {
   return rows;
 }
 
-/** 名片 tab：站名 / 站主 / identity / contact / 工作约束——完整拥有 identity 与 contact 两列（与站点配置零交叉，独立数据单元）。 */
+/** identity 中由站点配置页保存的键；其余键由名片页保存。 */
+export const SITE_IDENTITY_KEYS = ["one_liner", "logo_url"] as const;
+
+
+/** 合并本页拥有的 identity 键；其余键保留数据库当前值。 */
+export function mergeIdentity(current: unknown, patch: Record<string, unknown>) {
+  const base = current && typeof current === "object" && !Array.isArray(current) ? current as Record<string, unknown> : {};
+  return { ...base, ...patch };
+}
+
+let cardIdentityValidator: ReturnType<typeof ajv.compile> | null = null;
+function validateCardIdentity() {
+  if (!cardIdentityValidator) {
+    const full = schema.properties.identity;
+    cardIdentityValidator = ajv.compile({
+      $schema: schema.$schema, $defs: schema.$defs, ...full,
+      required: full.required.filter((key) => !(SITE_IDENTITY_KEYS as readonly string[]).includes(key)),
+    });
+  }
+  return cardIdentityValidator;
+}
+
+/** 名片 tab：站主 / identity 名片字段 / contact / 工作约束。站名、Logo 与一句话在站点配置。 */
 export function parseCardSettings(form: FormData) {
   const identity = {
-    one_liner: value(form, "one_liner"),
     languages: list(form, "languages"),
     timezone: value(form, "timezone"),
     focus_areas: list(form, "focus_areas"),
-    logo_url: value(form, "logo_url"),
     avatar_url: value(form, "avatar_url"),
     social_links: parseSocialLinks(form),
     custom_zone: {
@@ -112,22 +134,20 @@ export function parseCardSettings(form: FormData) {
     }),
   };
   checkSlug(value(form, "booking_page"), "预约页面");
-  const validateIdentity = compileSub("identity");
+  const validateIdentity = validateCardIdentity();
   if (!validateIdentity(identity)) {
     const field = validateIdentity.errors?.[0]?.instancePath.split("/")[1];
     const hints: Record<string, string> = {
-      one_liner: "一句话介绍不能为空，最多 180 字。",
       languages: "服务语言请每行填写语言代码，例如 zh-CN 或 en，最多 4 项。",
       timezone: "时区请填写 IANA 标识，例如 Asia/Shanghai。",
       focus_areas: "专注领域最多 12 项，每项不超过 40 字。",
-      logo_url: "站点 Logo 地址过长，请检查链接。",
       avatar_url: "站主头像地址过长，请检查链接。",
       social_links: "平台露出信息格式无效，请检查显示名和链接。",
       custom_zone: "名片自定义区内容过长或格式无效。",
     };
     throw new Error(
       hints[field ?? ""] ??
-        "名片配置不完整或格式无效，请检查一句话、语言、时区与平台露出。",
+        "名片配置不完整或格式无效，请检查语言、时区与平台露出。",
     );
   }
   const validateContact = compileSub("contact");
@@ -138,15 +158,9 @@ export function parseCardSettings(form: FormData) {
   } catch {
     throw new Error("请输入有效 IANA 时区，例如 Asia/Shanghai。");
   }
-  checkUrl(form, "logo_url", "站点 Logo");
   checkUrl(form, "avatar_url", "站主头像");
-  if (
-    !value(form, "site_name") ||
-    !value(form, "owner_name") ||
-    value(form, "site_name").length > 120 ||
-    value(form, "owner_name").length > 120
-  )
-    throw new Error("请检查站名与站主名称长度（120 字以内）。");
+  if (!value(form, "owner_name") || value(form, "owner_name").length > 120)
+    throw new Error("请填写站主名称（120 字以内）。");
   const constraints = {
     working_hours: value(form, "working_hours"),
     response_time: value(form, "response_time"),
@@ -157,7 +171,6 @@ export function parseCardSettings(form: FormData) {
   if (!validateConstraints(constraints))
     throw new Error("工作约束字段格式无效（工作时间 / 响应时间 / 容量必填）。");
   return {
-    site_name: value(form, "site_name"),
     owner_name: value(form, "owner_name"),
     identity,
     contact,
@@ -183,8 +196,23 @@ export const FACTS = [
 export function parseSiteSettings(form: FormData) {
   const home_config = {
     hero: {
-      ask_placeholder: value(form, "ask_placeholder"),
-      enabled: form.has("hero_enabled"),
+      banner_enabled: form.has("banner_enabled"),
+      ...(value(form, "hero_subtitle") && { subtitle: value(form, "hero_subtitle") }),
+      layout: value(form, "hero_layout") === "left" ? "left" : "center",
+      ...(value(form, "hero_image_url") && {
+        image_url: value(form, "hero_image_url"),
+        ...(value(form, "hero_image_alt") && { image_alt: value(form, "hero_image_alt") }),
+      }),
+      actions: {
+        subscribe: {
+          enabled: form.has("hero_action_subscribe"),
+          ...(value(form, "hero_action_subscribe_label") && { label: value(form, "hero_action_subscribe_label") }),
+        },
+        chat: {
+          enabled: form.has("hero_action_chat"),
+          ...(value(form, "hero_action_chat_label") && { label: value(form, "hero_action_chat_label") }),
+        },
+      },
       ...(value(form, "banner_light_url") && {
         banner_light_url: value(form, "banner_light_url"),
       }),
@@ -226,9 +254,15 @@ export function parseSiteSettings(form: FormData) {
     throw new Error(
       "首页五个内容区块（博客/手册/技能/活动/服务）必须各出现一次。",
     );
+  if (!form.has("hero_action_subscribe") && !form.has("hero_action_chat"))
+    throw new Error("首屏按钮至少勾选一个：订阅或和我聊聊。");
+  if (value(form, "hero_image_url") && !value(form, "hero_image_alt"))
+    throw new Error("请为首屏右侧图片填写替代文字。");
+  if (value(form, "hero_subtitle").length > HERO_SUBTITLE_MAX)
+    throw new Error(`首屏副标题不超过 ${HERO_SUBTITLE_MAX} 字。`);
   const validateHome = compileSub("home_config");
   if (!validateHome(home_config))
-    throw new Error("首页配置不完整或格式无效，请检查五块与事实徽章。");
+    throw new Error("首页配置不完整或格式无效，请检查首屏按钮文字（不超过 16 字）、图片替代文字、五块与事实徽章。");
 
   const payment_channels = (["alipay", "wxpay"] as const).filter((channel) =>
     form.has(`channel.${channel}`),
@@ -253,18 +287,36 @@ export function parseSiteSettings(form: FormData) {
       : null,
     refund_policy_page: value(form, "refund_policy_page"),
     subscribe_page: value(form, "subscribe_page"),
+    subscription_hint:
+      value(form, "subscription_hint_icon") || value(form, "subscription_hint_text")
+        ? {
+            icon: value(form, "subscription_hint_icon"),
+            text: value(form, "subscription_hint_text"),
+          }
+        : null,
   };
   checkSlug(value(form, "refund_policy_page"), "退款政策页面");
   checkSlug(value(form, "subscribe_page"), "订阅链接页面");
   const validateCommerce = compileSub("commerce");
   if (!validateCommerce(commerce))
-    throw new Error("商业配置不完整或格式无效，请检查订阅价格与退款政策页面。");
+    throw new Error("商业配置不完整或格式无效，请检查订阅价格、订阅提示（不超过 40 字）与退款政策页面。");
 
+  checkUrl(form, "logo_url", "站点 Logo");
+  if (!value(form, "site_name") || value(form, "site_name").length > 120)
+    throw new Error("请填写站名（120 字以内）。");
+  const oneLiner = String(form.get("one_liner") ?? "").trim();
+  if (!oneLiner || oneLiner.length > ONE_LINER_MAX)
+    throw new Error(`一句话介绍不能为空，最多 ${ONE_LINER_MAX} 字。`);
+  if (value(form, "logo_url").length > 2048)
+    throw new Error("站点 Logo 地址过长，请检查链接。");
   checkUrl(form, "banner_light_url", "浅色横幅图片");
   checkUrl(form, "banner_dark_url", "深色横幅图片");
+  checkUrl(form, "hero_image_url", "首屏右侧图片");
   if (value(form, "tagline").length > 300)
-    throw new Error("站点简介不超过 300 字。");
+    throw new Error("LOGO 小标题不超过 300 字。");
   return {
+    site_name: value(form, "site_name"),
+    identity: { one_liner: oneLiner, logo_url: value(form, "logo_url") },
     tagline: value(form, "tagline") || null,
     footer_credit: form.has("footer_credit"),
     home_config,

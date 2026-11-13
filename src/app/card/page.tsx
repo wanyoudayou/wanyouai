@@ -37,6 +37,7 @@ export default async function CardPage() {
               amount={site.commerce.subscriptionPrice.amount}
               currency={currency}
               paymentEnabled={site.commerce.paymentEnabled}
+              hint={site.commerce}
             />
           ) : null}
         </div>

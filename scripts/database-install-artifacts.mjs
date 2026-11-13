@@ -224,6 +224,12 @@ with expected_tables(name) as (values
     not has_function_privilege('anon','public.create_pending_order(uuid,text,bigint,numeric)','EXECUTE')
     and not has_function_privilege('authenticated','public.create_pending_order(uuid,text,bigint,numeric)','EXECUTE')
     and has_function_privilege('service_role','public.create_pending_order(uuid,text,bigint,numeric)','EXECUTE')
+  union all select 'content_order_delete_service_only', to_regprocedure('public.order_content_files(text,bigint[])') is null
+    and not exists(select 1 from (values ('public.order_series_chapters(bigint,bigint[])'),('public.delete_free_article(bigint,timestamp with time zone)'),
+      ('public.stage_content_file(text,text,text,text,jsonb,bigint,text)')) f(name)
+      where to_regprocedure(f.name) is null or has_function_privilege('anon',f.name,'EXECUTE') or has_function_privilege('authenticated',f.name,'EXECUTE')
+        or not has_function_privilege('service_role',f.name,'EXECUTE')
+        or not exists(select 1 from pg_proc where oid=f.name::regprocedure and not prosecdef and proconfig=array['search_path=""']))
   union all select 'email_outbox_client_access_denied', not exists(select 1 from
     (values ('anon'),('authenticated')) roles(name) cross join (values ('SELECT'),('INSERT'),('UPDATE'),('DELETE')) privileges(name)
     where has_table_privilege(roles.name,'public.email_outbox',privileges.name))

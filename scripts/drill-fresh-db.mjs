@@ -30,8 +30,8 @@ report('service 可调 settle_payment（ORDER_NOT_FOUND 证明可执行）',awai
 report('service 读初始 site_config 1 行',(await db.query(`select count(*)::int c from site_config`)).rows[0].c===1);
 report('service 可调 queued 结算',await fails(()=>db.query(`select settle_payment_queued(999999,'probe',1,'{}'::jsonb)`),/ORDER_NOT_FOUND/));
 report('空库 service 领取邮件返回 null',(await db.query('select claim_email_job() result')).rows[0].result===null);
-const sec=await db.query(`select p.proname,p.prosecdef from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('stage_content_file','commit_file_publication','order_content_files','settle_payment','manage_content','settle_payment_queued','claim_email_job','prepare_email_job','finish_email_job','email_outbox_health','queue_grant_email')`);
-report('关键函数全部 SECURITY INVOKER',sec.rows.length===11&&sec.rows.every(r=>r.prosecdef===false)?true:sec.rows);
+const sec=await db.query(`select p.proname,p.prosecdef from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('stage_content_file','commit_file_publication','order_series_chapters','delete_free_article','settle_payment','manage_content','settle_payment_queued','claim_email_job','prepare_email_job','finish_email_job','email_outbox_health','queue_grant_email')`);
+report('关键函数全部 SECURITY INVOKER',sec.rows.length===12&&sec.rows.every(r=>r.prosecdef===false)?true:sec.rows);
 report('旧无参站主认领 RPC 已移除',(await db.query("select to_regprocedure('public.claim_owner()')::text old")).rows[0].old===null);
 report('authenticated 无权直接认领站主',(await db.query("select has_function_privilege('authenticated','public.claim_owner_for(uuid,text)','EXECUTE') allowed")).rows[0].allowed===false);
 const passed=results.filter(r=>r.v===true).length;

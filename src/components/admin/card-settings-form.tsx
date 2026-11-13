@@ -30,11 +30,6 @@ export function CardSettingsForm({
     ? site.contact.bookingUrl.slice(3)
     : "";
   const fields = [
-    [
-      "site_name",
-      "站名（必填；显示在左栏顶部、名片页与页脚署名）",
-      site.siteName,
-    ],
     ["owner_name", "站主名称（必填；名片身份行）", site.ownerName],
     [
       "timezone",
@@ -49,7 +44,6 @@ export function CardSettingsForm({
       "联系邮箱（与预约页面至少填一项；建议使用公开联系邮箱）",
       site.contact.email ?? "",
     ],
-    ["logo_url", "站点 Logo（留空使用站名首字）", site.identity.logoUrl ?? ""],
     ["avatar_url", "站主头像", site.identity.avatarUrl ?? ""],
   ] as const;
   return (
@@ -57,12 +51,12 @@ export function CardSettingsForm({
       <input type="hidden" name="updated" value={state.updated || updated} />
       <fieldset disabled={pending} className="space-y-6">
         <p className="rounded-lg bg-muted px-3 py-2 text-xs leading-[1.7] text-muted-foreground">
-          这里管「你是谁」：首次保存请填写站名、站主、一句话，以及联系邮箱或预约页面；服务语言使用
-          zh-CN、en 这样的代码。首页外观与收款请去「站点配置」，分身请去「AI 设置」。
+          这里管「你是谁」：首次保存请填写站主名称，以及联系邮箱或预约页面；服务语言使用
+          zh-CN、en 这样的代码。站名、Logo 与一句话介绍在「站点配置」，收款也在那里；分身请去「AI 设置」。
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
           {fields.map(([name, label, value]) =>
-            name === "logo_url" || name === "avatar_url" ? (
+            name === "avatar_url" ? (
               <ImageField
                 key={name}
                 name={name}
@@ -93,16 +87,6 @@ export function CardSettingsForm({
             </select>
           </label>
         </div>
-        <label className="block space-y-1 text-sm">
-          一句话介绍（必填；1–2 句，支持换行；显示在首页大横幅与名片头部）
-          <textarea
-            name="one_liner"
-            defaultValue={site.identity.oneLiner}
-            rows={2}
-            maxLength={180}
-            className="block w-full rounded-md border bg-background p-2"
-          />
-        </label>
         <div className="grid gap-4 sm:grid-cols-2">
           {(
             [

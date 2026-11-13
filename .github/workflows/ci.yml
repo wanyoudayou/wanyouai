@@ -129,9 +129,16 @@ jobs:
       - name: Section bundle budgets
         run: npm run sections:budget
 
-  browser:
+  # The suite is split by file across two runners; the `browser` job below keeps
+  # the required check name and passes only when every shard passes.
+  browser-shard:
+    name: browser (${{ matrix.shard }}/2)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -161,4 +168,13 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Themes, responsive navigation and editing recovery
         timeout-minutes: 13
-        run: npm run test:browser
+        run: npm run test:browser -- --shard=${{ matrix.shard }}/2
+
+  browser:
+    needs: browser-shard
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: All browser shards passed
+        run: test "${{ needs.browser-shard.result }}" = success

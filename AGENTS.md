@@ -85,7 +85,7 @@ supabase/verify.sql
 
 ## 7. 产品状态与权威路径
 
-- 内容：`draft → published ⇄ paused → archived`。暂停停售不停读，向直接购买者通知三个月保留期；归档需 paused 满三个月，DB 强制，归档静默。受信维护修复不得被当作普通操作旁路。
+- 内容：`draft → published ⇄ paused → archived`。暂停停售不停读，向直接购买者通知三个月保留期；归档需 paused 满三个月，DB 强制，归档静默。免费（公开或注册可读）、非 README、本身及所属专辑都没有订单或权益的博客与章节，站主可删除以纠正误发布。受信维护修复不得被当作普通操作旁路。
 - 订单：`pending → paid → fulfilled / failed / refunded`，仅支付 authority 可确认收款；不能伪造已付或删除交易。可信关旧单须有对账证据和停收款条件。
 - 服务：`inquiry → quoted → booked → in_progress → delivered → accepted → settled`；客户要求修改可 `delivered → in_progress`。报价、协议、交付留快照；验收仅客户操作，付款线下完成。
 - 活动：`upcoming → registering → ended`；核销与 event 权益同事务、幂等，个人资料仅本人和站主可读。

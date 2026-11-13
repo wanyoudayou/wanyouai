@@ -10,7 +10,14 @@ import { useUnsavedChanges } from "./use-unsaved-changes";
 import { ImageField, MediaPicker } from "./media-library";
 import { assetImageHtml } from "@/lib/media/html";
 import { CURRENCY_OPTIONS } from "@/lib/format";
+import { SocialIcon } from "@/components/card/social-icon";
+import { SUBSCRIPTION_HINT_ICON_LABELS, SUBSCRIPTION_HINT_ICON_NAMES, SUBSCRIPTION_HINT_TEXT_MAX } from "@/lib/subscription-hint";
 import {
+  HERO_ACTION_LABEL_MAX,
+  ONE_LINER_MAX,
+  HERO_CHAT_LABEL,
+  HERO_IMAGE_ALT_MAX,
+  HERO_SUBTITLE_MAX,
   HOME_BLOCK_TITLES,
   SOCIAL_PLATFORMS,
   type FactBadgeType,
@@ -61,7 +68,7 @@ export function SettingsForm({
     >
       <input type="hidden" name="updated" value={updated} />
       <p className="text-sm text-muted-foreground">
-        站主资料在「站主名片」管理，模型与额度在「AI 设置」管理。两个分页共用一次保存。
+        站名、Logo 与一句话在这里管理；站主资料与联系方式在「站主名片」，模型与额度在「AI 设置」。两个分页共用一次保存。
       </p>
       <fieldset disabled={pending} className="min-w-0">
         <Tabs defaultValue="home" className="space-y-6">
@@ -70,36 +77,29 @@ export function SettingsForm({
             <TabsTrigger value="commerce">收款与价格</TabsTrigger>
           </TabsList>
           <TabsContent value="home" forceMount className="space-y-8 data-[state=inactive]:hidden">
-            <section className="space-y-4">
-              <h2 className="text-lg font-medium">首页首屏</h2>
+            <section className="space-y-4" aria-labelledby="settings-logo">
+              <div className="space-y-1">
+                <h2 id="settings-logo" className="text-lg font-medium">LOGO</h2>
+                <p className="text-sm text-muted-foreground">显示在左栏顶部；站名同时用于名片页、页脚署名与浏览器标题。</p>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
-                {textField("tagline", "站点简介", site.tagline ?? "")}
-                {textField("ask_placeholder", "首页提问提示", site.home.askPlaceholder)}
+                <label className="space-y-1 text-sm">
+                  站名（必填）
+                  <Input name="site_name" defaultValue={site.siteName} maxLength={120} required />
+                </label>
+                <label className="space-y-1 text-sm">
+                  LOGO 小标题
+                  <Input name="tagline" defaultValue={site.tagline ?? ""} maxLength={300} />
+                </label>
                 <ImageField
-                  name="banner_light_url"
-                  label="首页横幅 · 浅色模式"
-                  defaultValue={site.home.bannerLightUrl ?? ""}
-                  disabled={pending}
-                />
-                <ImageField
-                  name="banner_dark_url"
-                  label="首页横幅 · 深色模式"
-                  defaultValue={site.home.bannerDarkUrl ?? ""}
+                  name="logo_url"
+                  label="站点 Logo（留空使用站名首字）"
+                  defaultValue={site.identity.logoUrl ?? ""}
                   disabled={pending}
                 />
               </div>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  name="hero_enabled"
-                  defaultChecked={site.home.heroEnabled}
-                />
-                显示首页横幅
-              </label>
-              <p className="text-xs leading-6 text-muted-foreground">
-                横幅按外观模式切换，每一版留空时使用对应的内置背景。浅色模式使用深色文字，深色模式使用浅色文字。
-              </p>
             </section>
+            <HeroSettings site={site} disabled={pending} />
             <CustomZoneEditor
               html={site.home.customZone.html}
               enabled={site.home.customZone.enabled}
@@ -238,6 +238,36 @@ export function SettingsForm({
                   </select>
                   <span className="block text-xs text-muted-foreground">
                     用于全站价格显示。在线收款按人民币结算，开通收款时请选人民币。
+                  </span>
+                </label>
+                <label className="space-y-1 text-sm">
+                  订阅按钮图标
+                  <select
+                    name="subscription_hint_icon"
+                    defaultValue={site.commerce.subscriptionHint?.icon ?? ""}
+                    className="block w-full rounded-md border bg-background p-2"
+                  >
+                    <option value="">不显示图标</option>
+                    {SUBSCRIPTION_HINT_ICON_NAMES.map((name) => (
+                      <option key={name} value={name}>
+                        {SUBSCRIPTION_HINT_ICON_LABELS[name]}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="block text-xs text-muted-foreground">
+                    显示在订阅购买按钮的价格前。
+                  </span>
+                </label>
+                <label className="space-y-1 text-sm">
+                  订阅按钮提示
+                  <Input
+                    name="subscription_hint_text"
+                    defaultValue={site.commerce.subscriptionHint?.text ?? ""}
+                    maxLength={SUBSCRIPTION_HINT_TEXT_MAX}
+                    placeholder="如：约每月一杯美式"
+                  />
+                  <span className="block text-xs text-muted-foreground">
+                    选了图标或填写提示后，订阅按钮下方显示按年价折算的月均金额，提示接在其后；两项都留空则不显示。仅作展示，不改变订单金额。
                   </span>
                 </label>
                 <label className="space-y-1 text-sm">
@@ -595,11 +625,15 @@ export function SocialLinksEditor({
       ) : null}
       {rows.map((row, i) => (
         <div key={row.rowId} className="flex flex-wrap items-end gap-2">
+          <SocialIcon platform={row.platform} className="mb-0.5" />
           <label className="space-y-1 text-sm">
             平台
             <select
               name={`social.${i}.platform`}
               defaultValue={row.platform}
+              onChange={(event) =>
+                setRows(rows.map((item) => item.rowId === row.rowId ? { ...item, platform: event.target.value as SocialPlatform } : item))
+              }
               className="block w-36 rounded-md border bg-background p-2"
             >
               {Object.entries(SOCIAL_PLATFORMS).map(([key, meta]) => (
@@ -649,6 +683,114 @@ export function SocialLinksEditor({
           </Button>
         </div>
       ))}
+    </section>
+  );
+}
+
+/** 首页首屏：一句话与副标题、布局（左对齐可配右侧图片）、行动按钮（至少勾选一个）与横幅背景图。 */
+function HeroSettings({ site, disabled }: { site: SiteContext; disabled: boolean }) {
+  const hero = site.home.hero;
+  const [layout, setLayout] = useState(hero.layout);
+  const [image, setImage] = useState(hero.imageUrl ?? "");
+  const [subscribe, setSubscribe] = useState(hero.actions.subscribe.enabled);
+  const [chat, setChat] = useState(hero.actions.chat.enabled);
+  const [banner, setBanner] = useState(site.home.bannerEnabled);
+  const subscribeReady = site.commerce.paymentEnabled && !!site.commerce.subscriptionPrice;
+  const warnings = [
+    subscribe && !subscribeReady ? "订阅按钮需要先设置订阅价格并开通在线收款，否则首页不显示。" : null,
+    chat && !site.avatar.enabled ? "和我聊聊需要先在 AI 设置中开启分身，否则首页不显示。" : null,
+  ].filter(Boolean);
+  return (
+    <section className="space-y-5" aria-labelledby="settings-hero">
+      <h2 id="settings-hero" className="text-lg font-medium">首页首屏</h2>
+      <div className="space-y-4">
+        <label className="block space-y-1 text-sm">
+          一句话介绍（必填；1–2 句，支持换行；显示在首页首屏与名片头部）
+          <textarea name="one_liner" defaultValue={site.identity.oneLiner} rows={2} maxLength={ONE_LINER_MAX} required
+            className="block w-full rounded-md border bg-background p-2" />
+        </label>
+        <label className="block space-y-1 text-sm">
+          副标题（可选）
+          <Input name="hero_subtitle" defaultValue={hero.subtitle ?? ""} maxLength={HERO_SUBTITLE_MAX}
+            placeholder="一两句补充：帮谁、解决什么、怎么交付" />
+        </label>
+      </div>
+      <fieldset className="space-y-2 text-sm">
+        <legend className="mb-1">布局</legend>
+        <div className="flex flex-wrap gap-4">
+          {([["center", "居中"], ["left", "左对齐（可配右侧图片）"]] as const).map(([value, label]) => (
+            <label key={value} className="flex items-center gap-2">
+              <input type="radio" name="hero_layout" value={value} checked={layout === value}
+                onChange={() => setLayout(value)} />
+              {label}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      {layout === "left" ? (
+        <div className="grid items-start gap-4 sm:grid-cols-2">
+          <ImageField name="hero_image_url" label="右侧图片（可选，随滚动视差缩放；窄屏不显示）" defaultValue={image}
+            onChange={setImage} disabled={disabled} />
+          <label className="space-y-1 text-sm">
+            图片替代文字{image ? "（必填）" : ""}
+            <Input name="hero_image_alt" defaultValue={hero.imageAlt ?? ""} maxLength={HERO_IMAGE_ALT_MAX}
+              required={!!image} placeholder="描述图片内容，供读屏与图片加载失败时显示" />
+          </label>
+        </div>
+      ) : (
+        <>
+          {image && <input type="hidden" name="hero_image_url" value={image} />}
+          {hero.imageAlt && <input type="hidden" name="hero_image_alt" value={hero.imageAlt} />}
+        </>
+      )}
+      <fieldset className="space-y-3 text-sm">
+        <legend className="mb-1">按钮（至少勾选一个）</legend>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-2">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" name="hero_action_subscribe" checked={subscribe}
+                onChange={(event) => setSubscribe(event.target.checked)} />
+              订阅按钮
+            </label>
+            <Input name="hero_action_subscribe_label" aria-label="订阅按钮文字" defaultValue={hero.actions.subscribe.label ?? ""}
+              maxLength={HERO_ACTION_LABEL_MAX} placeholder="默认：订阅 · 价格 / 年" />
+          </div>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" name="hero_action_chat" checked={chat}
+                onChange={(event) => setChat(event.target.checked)} />
+              和我聊聊
+            </label>
+            <Input name="hero_action_chat_label" aria-label="和我聊聊按钮文字" defaultValue={hero.actions.chat.label ?? ""}
+              maxLength={HERO_ACTION_LABEL_MAX} placeholder={`默认：${HERO_CHAT_LABEL}`} />
+          </div>
+        </div>
+        {!subscribe && !chat && <p role="alert" className="text-destructive">至少勾选一个按钮。</p>}
+        {warnings.map((warning) => <p key={warning} className="text-muted-foreground">{warning}</p>)}
+        <p className="text-xs leading-6 text-muted-foreground">
+          勾选和我聊聊时，首页右侧分身栏默认收起，访客点按钮后展开并直接输入。订阅按钮链接到订阅说明页，已订阅读者看到会员剩余天数。
+        </p>
+      </fieldset>
+      <fieldset className="space-y-3 text-sm">
+        <legend className="mb-1">横幅背景图</legend>
+        <label className="flex items-center gap-2">
+          <input type="checkbox" name="banner_enabled" checked={banner}
+            onChange={(event) => setBanner(event.target.checked)} />
+          显示首页横幅图
+        </label>
+        <div className="grid items-start gap-4 sm:grid-cols-2" aria-disabled={!banner || undefined}
+          data-muted={!banner || undefined}>
+          <ImageField name="banner_light_url" label="首页横幅图 · 浅色模式"
+            defaultValue={site.home.bannerLightUrl ?? ""} disabled={disabled} />
+          <ImageField name="banner_dark_url" label="首页横幅图 · 深色模式"
+            defaultValue={site.home.bannerDarkUrl ?? ""} disabled={disabled} />
+        </div>
+        <p className="text-xs leading-6 text-muted-foreground">
+          {banner
+            ? "横幅按外观模式切换，每一版留空时使用对应的内置背景。浅色模式使用深色文字，深色模式使用浅色文字。"
+            : "已关闭横幅图：首屏文字与按钮照常显示在页面底色上，底部加一条浅分隔线；已选图片保留。"}
+        </p>
+      </fieldset>
     </section>
   );
 }

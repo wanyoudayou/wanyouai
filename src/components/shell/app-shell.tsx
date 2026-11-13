@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { SubscribeStateProvider } from "@/components/shell/subscribe-state";
 import {
   AdminPanelProvider,
   AdminWorkspaceGrid,
@@ -56,6 +57,8 @@ export interface AppShellProps {
   avatarEnabled: boolean;
   avatarAnonymous: boolean;
   turnstileSiteKey: string | null;
+  /** 首页 Hero 提供「和我聊聊」：首页右栏默认收起 */
+  homeChat?: boolean;
   footer: {
     siteName: string;
     credit: boolean;
@@ -73,6 +76,7 @@ export function AppShell({
   avatarEnabled,
   avatarAnonymous,
   turnstileSiteKey,
+  homeChat = false,
   footer,
   children,
   owner = false,
@@ -107,7 +111,9 @@ export function AppShell({
         avatarAnonymous={avatarAnonymous}
         turnstileSiteKey={turnstileSiteKey}
         loggedIn={!!user}
+        homeCollapsed={homeChat}
       >
+        <SubscribeStateProvider value={subscribe}>
         <ReadingShellProvider>
           <ShellLayout
             admin={admin}
@@ -118,6 +124,7 @@ export function AppShell({
             {children}
           </ShellLayout>
         </ReadingShellProvider>
+        </SubscribeStateProvider>
       </RightPanelProvider>
     </AdminPanelProvider>
   );
